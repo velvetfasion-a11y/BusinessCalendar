@@ -1,10 +1,10 @@
-# BusinessCalendar / Achieve
+# Achieve
 
-iOS app in `Achieve/` · **Live web app:** [velvetfasion-a11y.github.io/BusinessCalendar](https://velvetfasion-a11y.github.io/BusinessCalendar/)
+Phone-first web app matching the Achieve iOS product: **Habits · Chat · Note**.
 
-## Web (browser)
+**Live:** [velvetfasion-a11y.github.io/BusinessCalendar](https://velvetfasion-a11y.github.io/BusinessCalendar/)
 
-Full Achieve shell: Habits · AI Coach · Journal · Schedule · Profile.
+## Run locally
 
 ```bash
 cd web
@@ -12,8 +12,8 @@ npm install --onnxruntime-node-install-cuda=skip
 npm run dev
 ```
 
-Open in Chrome/Edge. WebGPU enables full WebLLM on the AI Coach tab; otherwise the built-in coach replies.
+Open on a phone-width viewport (or DevTools device mode). Gold Dark theme by default; switch themes from Account (profile icon).
 
 ## iOS
 
-Open `Achieve.xcodeproj` in Xcode.
+The Swift project in `Achieve/` remains in the repo. The live website follows the luxury product UI (3-tab Habits / Chat / Note).

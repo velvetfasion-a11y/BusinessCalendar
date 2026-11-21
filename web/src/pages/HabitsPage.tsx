@@ -1,231 +1,234 @@
 import { useMemo, useState } from 'react'
-import { useStore, dayKey } from '../lib/store'
+import { dayKey, useStore } from '../lib/store'
+import { HABIT_SYMBOLS, type Habit } from '../lib/types'
+import { EditHabitSheet } from './EditHabitSheet'
 
-export function HabitsPage() {
+const DAY_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+
+function ProfileIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7">
+      <circle cx="12" cy="8" r="3.2" />
+      <path d="M5.5 19c1.4-3 3.7-4.5 6.5-4.5S17.1 16 18.5 19" strokeLinecap="round" />
+    </svg>
+  )
+}
+
+export function HabitsPage({ onProfile }: { onProfile: () => void }) {
   const store = useStore()
-  const [selected, setSelected] = useState(() => {
+  const today = useMemo(() => {
     const d = new Date()
     d.setHours(0, 0, 0, 0)
     return d
-  })
-  const [editingId, setEditingId] = useState<string | null>(null)
-  const [editTitle, setEditTitle] = useState('')
-  const [newTitle, setNewTitle] = useState('')
-  const [showAdd, setShowAdd] = useState(false)
-  const [reorder, setReorder] = useState(false)
+  }, [])
+  const [editHabit, setEditHabit] = useState<Habit | null>(null)
+  const [creating, setCreating] = useState(false)
 
-  const progress = store.progressFor(selected)
-  const todayKey = dayKey(new Date())
-  const selectedKey = dayKey(selected)
+  const todayProgress = store.progressFor(today)
+  const todayHabits = store.habitsFor(today)
+  const todayDone = todayHabits.filter((h) => store.isDone(h, today)).length
+  const pct = Math.round(todayProgress * 100)
+  const circumference = 2 * Math.PI * 72
 
-  const dayTitle = useMemo(() => {
-    if (selectedKey === todayKey) return 'Today'
-    return selected.toLocaleDateString('en-US', { weekday: 'long' })
-  }, [selected, selectedKey, todayKey])
+  const otherDays = store.weekDays.filter((d) => dayKey(d) !== dayKey(today))
 
   return (
     <div className="page habits-page">
-      <h1 className="page-title">Achieve</h1>
-
-      <div className="radial" style={{ ['--accent' as string]: store.accentHex }}>
-        <svg viewBox="0 0 120 120" className="radial-svg">
-          <circle cx="60" cy="60" r="46" className="radial-track" />
-          <circle
-            cx="60"
-            cy="60"
-            r="46"
-            className="radial-fill"
-            style={{
-              strokeDasharray: `${progress * 289} 289`,
-            }}
-          />
-        </svg>
-        <span className="radial-label">{Math.round(progress * 100)}%</span>
+      <div className="top-row">
+        <span style={{ width: 36 }} />
+        <h1 className="brand-title">Achieve</h1>
+        <button type="button" className="profile-btn" onClick={onProfile} aria-label="Account">
+          <ProfileIcon />
+        </button>
       </div>
 
-      <p className="goals-line" style={{ color: store.accentHex }}>
-        Goals for {dayTitle}: {Math.round(progress * 100)}%
-      </p>
+      <div className="progress-wrap">
+        <div className="progress-ring">
+          <svg viewBox="0 0 160 160">
+            <circle className="track" cx="80" cy="80" r="72" />
+            <circle
+              className="fill"
+              cx="80"
+              cy="80"
+              r="72"
+              style={{
+                strokeDasharray: `${(pct / 100) * circumference} ${circumference}`,
+              }}
+            />
+          </svg>
+          <div className="progress-center">
+            <strong>{pct}</strong>
+            <span>TODAY</span>
+          </div>
+        </div>
+      </div>
 
-      <div className="week-strip">
-        {store.weekDays.map((day) => {
-          const key = dayKey(day)
-          const p = store.progressFor(day)
-          const isToday = key === todayKey
-          const isSel = key === selectedKey
+      <div className="stats-row">
+        <div className="stat-block">
+          <label>WEEK</label>
+          <strong>{store.weekCompletedCount}</strong>
+        </div>
+        <div className="stat-divider" />
+        <div className="stat-block">
+          <label>HABITS</label>
+          <strong>{store.habits.length}</strong>
+        </div>
+      </div>
+      <div className="gold-rule" />
+
+      <DayCard
+        date={today}
+        isToday
+        habits={todayHabits}
+        doneCount={todayDone}
+        onToggle={(id) => store.toggleHabit(id, today)}
+        onEdit={(h) => setEditHabit(h)}
+        note={store.dayNote(dayKey(today))}
+        onNote={(text) => store.setDayNote(dayKey(today), text)}
+        isDone={(h) => store.isDone(h, today)}
+      />
+
+      <div className="day-grid">
+        {otherDays.map((d) => {
+          const habits = store.habitsFor(d)
+          const done = habits.filter((h) => store.isDone(h, d)).length
           return (
-            <button
-              key={key}
-              type="button"
-              className="week-day"
-              onClick={() => setSelected(day)}
-            >
-              <span className="week-bar">
-                <span
-                  className="week-bar-fill"
-                  style={{
-                    height: `${Math.max(p * 100, 0)}%`,
-                    background: store.accentHex,
-                  }}
-                />
-              </span>
-              <span
-                className={`week-name ${isSel ? 'sel' : ''} ${isToday ? 'today' : ''}`}
-                style={isToday ? { color: store.accentHex } : undefined}
-              >
-                {day.toLocaleDateString('en-US', { weekday: 'short' })}
-              </span>
-            </button>
+            <DayCard
+              key={dayKey(d)}
+              date={d}
+              habits={habits}
+              doneCount={done}
+              onToggle={(id) => store.toggleHabit(id, d)}
+              onEdit={(h) => setEditHabit(h)}
+              note={store.dayNote(dayKey(d))}
+              onNote={(text) => store.setDayNote(dayKey(d), text)}
+              isDone={(h) => store.isDone(h, d)}
+              compact
+            />
           )
         })}
       </div>
 
-      <div className="dream-head three">
-        <h2>Dream ✨</h2>
-        <button
-          type="button"
-          className="day-jump"
-          style={{ color: store.accentHex }}
-          onClick={() => {
-            const t = new Date()
-            t.setHours(0, 0, 0, 0)
-            setSelected(t)
+      <button
+        type="button"
+        className="fab"
+        aria-label="Add habit"
+        onClick={() => setCreating(true)}
+      >
+        +
+      </button>
+
+      {(editHabit || creating) && (
+        <EditHabitSheet
+          habit={editHabit}
+          onClose={() => {
+            setEditHabit(null)
+            setCreating(false)
           }}
-        >
-          🗓️ {dayTitle}
-        </button>
-        <button
-          type="button"
-          className="reorder-btn"
-          onClick={() => setReorder((v) => !v)}
-        >
-          {reorder ? 'Done' : 'Reorder'}
-        </button>
-      </div>
-
-      <div className="habit-list">
-        {store.habits.map((habit, index) => {
-          const done = store.isHabitDone(habit, selected)
-          return (
-            <div key={habit.id} className="habit-row">
-              {reorder && (
-                <div className="reorder-controls">
-                  <button
-                    type="button"
-                    disabled={index === 0}
-                    onClick={() => store.moveHabit(index, index - 1)}
-                    aria-label="Move up"
-                  >
-                    ↑
-                  </button>
-                  <button
-                    type="button"
-                    disabled={index === store.habits.length - 1}
-                    onClick={() => store.moveHabit(index, index + 1)}
-                    aria-label="Move down"
-                  >
-                    ↓
-                  </button>
-                </div>
-              )}
-              <button
-                type="button"
-                className="habit-title"
-                onClick={() => {
-                  setEditingId(habit.id)
-                  setEditTitle(habit.title)
-                }}
-              >
-                {habit.title}
-              </button>
-              <button
-                type="button"
-                className={`habit-toggle ${done ? 'done' : ''}`}
-                style={done ? { color: store.accentHex } : undefined}
-                onClick={() => store.toggleHabit(habit.id, selected)}
-              >
-                {done ? '✓ Done' : '○ Tap'}
-              </button>
-            </div>
-          )
-        })}
-
-        <button
-          type="button"
-          className="add-habit"
-          style={{ color: store.accentHex, borderColor: store.accentHex }}
-          onClick={() => setShowAdd(true)}
-        >
-          Add Habit
-        </button>
-      </div>
-
-      {showAdd && (
-        <div className="modal">
-          <div className="modal-card">
-            <h3>Add Habit</h3>
-            <p className="empty-hint">Create your next Dream habit.</p>
-            <input
-              placeholder="Habit name"
-              value={newTitle}
-              onChange={(e) => setNewTitle(e.target.value)}
-              autoFocus
-            />
-            <div className="modal-actions">
-              <button
-                type="button"
-                onClick={() => {
-                  setShowAdd(false)
-                  setNewTitle('')
-                }}
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                className="primary-btn"
-                style={{ background: store.accentHex }}
-                onClick={() => {
-                  store.addHabit(newTitle)
-                  setNewTitle('')
-                  setShowAdd(false)
-                }}
-              >
-                Add
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {editingId && (
-        <div className="modal">
-          <div className="modal-card">
-            <h3>Edit</h3>
-            <input
-              value={editTitle}
-              onChange={(e) => setEditTitle(e.target.value)}
-              autoFocus
-            />
-            <div className="modal-actions">
-              <button type="button" onClick={() => setEditingId(null)}>
-                Cancel
-              </button>
-              <button
-                type="button"
-                className="primary-btn"
-                style={{ background: store.accentHex }}
-                onClick={() => {
-                  store.updateHabitTitle(editingId, editTitle)
-                  setEditingId(null)
-                }}
-              >
-                Save
-              </button>
-            </div>
-          </div>
-        </div>
+          onSave={(patch) => {
+            if (editHabit) store.updateHabit(editHabit.id, patch)
+            else
+              store.addHabit({
+                title: patch.title || 'New habit',
+                symbol: patch.symbol || HABIT_SYMBOLS[0],
+                days: patch.days || [0, 1, 2, 3, 4, 5, 6],
+                alarm: patch.alarm ?? null,
+              })
+            setEditHabit(null)
+            setCreating(false)
+          }}
+          onDelete={
+            editHabit
+              ? () => {
+                  store.deleteHabit(editHabit.id)
+                  setEditHabit(null)
+                }
+              : undefined
+          }
+        />
       )}
     </div>
+  )
+}
+
+function DayCard({
+  date,
+  isToday,
+  habits,
+  doneCount,
+  onToggle,
+  onEdit,
+  note,
+  onNote,
+  isDone,
+  compact,
+}: {
+  date: Date
+  isToday?: boolean
+  habits: Habit[]
+  doneCount: number
+  onToggle: (id: string) => void
+  onEdit: (h: Habit) => void
+  note: string
+  onNote: (t: string) => void
+  isDone: (h: Habit) => boolean
+  compact?: boolean
+}) {
+  const label = isToday
+    ? 'Today'
+    : date.toLocaleDateString('en-US', { weekday: 'short' }).toUpperCase()
+  const dateLabel = date.toLocaleDateString('en-GB', {
+    day: 'numeric',
+    month: 'short',
+  })
+
+  return (
+    <section className={`day-card ${isToday ? 'today' : ''}`}>
+      <div className="day-head">
+        <span className="day-badge">{DAY_SHORT[date.getDay()].slice(0, 3)}</span>
+        <span className="title">{isToday ? 'Today' : label}</span>
+        {!compact && <span className="date">{dateLabel}</span>}
+        {compact && <span className="date">{dateLabel}</span>}
+        <span className="frac">
+          {doneCount}/{habits.length || 0}
+        </span>
+      </div>
+
+      {habits.map((h) => {
+        const done = isDone(h)
+        return (
+          <div key={h.id} style={{ display: 'flex', gap: 4 }}>
+            <button
+              type="button"
+              className={`habit-pill ${done ? 'done' : ''}`}
+              onClick={() => onToggle(h.id)}
+              onContextMenu={(e) => {
+                e.preventDefault()
+                onEdit(h)
+              }}
+            >
+              <span className="sym">{h.symbol}</span>
+              <span className="label">{h.title}</span>
+              <span className={`check ${done ? 'on' : ''}`}>{done ? '✓' : ''}</span>
+            </button>
+          </div>
+        )
+      })}
+
+      {!habits.length && (
+        <p style={{ color: 'var(--muted)', fontSize: 12, margin: '4px 0 8px' }}>
+          No habits this day
+        </p>
+      )}
+
+      <textarea
+        className="notes-field"
+        rows={1}
+        placeholder="Notes"
+        value={note}
+        onChange={(e) => onNote(e.target.value)}
+        onClick={(e) => e.stopPropagation()}
+      />
+    </section>
   )
 }
