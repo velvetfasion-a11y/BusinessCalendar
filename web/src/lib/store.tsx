@@ -11,10 +11,11 @@ import type {
   CalendarEvent,
   CoachMode,
   Habit,
+  JournalPhoto,
   Note,
 } from './types'
 
-const STORAGE_KEY = 'achieve.web.v1'
+const STORAGE_KEY = 'achieve.web.v2'
 const DEFAULT_ACCENT = '#3F2A6B'
 
 function uid() {
@@ -34,7 +35,7 @@ function startOfWeek(d: Date) {
   const x = new Date(d)
   x.setHours(0, 0, 0, 0)
   const day = x.getDay()
-  const diff = day === 0 ? -6 : 1 - day // Monday start
+  const diff = day === 0 ? -6 : 1 - day
   x.setDate(x.getDate() + diff)
   return x
 }
@@ -42,16 +43,37 @@ function startOfWeek(d: Date) {
 function load(): AppData {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
-    if (raw) return JSON.parse(raw) as AppData
+    if (raw) {
+      const parsed = JSON.parse(raw) as Partial<AppData>
+      return {
+        habits: parsed.habits ?? [
+          { id: uid(), title: 'Drink water', completedDayKeys: [] },
+        ],
+        notes: parsed.notes ?? [],
+        photos: parsed.photos ?? [],
+        events: (parsed.events ?? []).map((e) => ({
+          ...e,
+          duration: e.duration ?? '1h',
+          isPinned: e.isPinned ?? false,
+          category: e.category ?? 'work',
+        })),
+        accentHex: parsed.accentHex ?? DEFAULT_ACCENT,
+        profileName: parsed.profileName ?? 'Guest',
+        profileEmail: parsed.profileEmail ?? null,
+        signedIn: parsed.signedIn ?? false,
+      }
+    }
   } catch {
     // ignore
   }
   return {
     habits: [{ id: uid(), title: 'Drink water', completedDayKeys: [] }],
     notes: [],
+    photos: [],
     events: [],
     accentHex: DEFAULT_ACCENT,
     profileName: 'Guest',
+    profileEmail: null,
     signedIn: false,
   }
 }
@@ -66,15 +88,18 @@ type Store = AppData & {
   moveHabit: (from: number, to: number) => void
   addNote: (text: string) => void
   deleteNote: (id: string) => void
+  addPhoto: (dataUrl: string, comment: string) => void
+  deletePhoto: (id: string) => void
   addEvent: (e: Omit<CalendarEvent, 'id'>) => void
   deleteEvent: (id: string) => void
   eventsOn: (d: Date) => CalendarEvent[]
   setAccent: (hex: string) => void
-  signIn: (name: string) => void
+  signIn: (name: string, email?: string) => void
   signOut: () => void
   resetAll: () => void
   lifetimeScore: number
   streakCount: number
+  loginStateText: string
 }
 
 const Ctx = createContext<Store | null>(null)
@@ -164,6 +189,21 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     },
     deleteNote: (id) =>
       persist({ ...data, notes: data.notes.filter((n) => n.id !== id) }),
+    addPhoto: (dataUrl, comment) =>
+      persist({
+        ...data,
+        photos: [
+          {
+            id: uid(),
+            dataUrl,
+            comment: comment.trim(),
+            createdAt: new Date().toISOString(),
+          },
+          ...data.photos,
+        ],
+      }),
+    deletePhoto: (id) =>
+      persist({ ...data, photos: data.photos.filter((p) => p.id !== id) }),
     addEvent: (e) =>
       persist({
         ...data,
@@ -171,19 +211,39 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       }),
     deleteEvent: (id) =>
       persist({ ...data, events: data.events.filter((e) => e.id !== id) }),
-    eventsOn: (d) => data.events.filter((e) => e.dateKey === dayKey(d)),
+    eventsOn: (d) =>
+      data.events
+        .filter((e) => e.dateKey === dayKey(d))
+        .sort(
+          (a, b) =>
+            a.startHour * 60 +
+            a.startMinute -
+            (b.startHour * 60 + b.startMinute),
+        ),
     setAccent: (hex) => persist({ ...data, accentHex: hex }),
-    signIn: (name) =>
-      persist({ ...data, signedIn: true, profileName: name.trim() || 'You' }),
+    signIn: (name, email) =>
+      persist({
+        ...data,
+        signedIn: true,
+        profileName: name.trim() || 'You',
+        profileEmail: email?.trim() || null,
+      }),
     signOut: () =>
-      persist({ ...data, signedIn: false, profileName: 'Guest' }),
+      persist({
+        ...data,
+        signedIn: false,
+        profileName: 'Guest',
+        profileEmail: null,
+      }),
     resetAll: () =>
       persist({
         habits: [{ id: uid(), title: 'Drink water', completedDayKeys: [] }],
         notes: [],
+        photos: [],
         events: [],
         accentHex: DEFAULT_ACCENT,
         profileName: 'Guest',
+        profileEmail: null,
         signedIn: false,
       }),
     lifetimeScore: (() => {
@@ -209,6 +269,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       }
       return streak
     })(),
+    loginStateText: data.signedIn ? 'Signed in' : 'Not signed in',
   }
 
   return <Ctx.Provider value={store}>{children}</Ctx.Provider>
@@ -220,5 +281,5 @@ export function useStore() {
   return ctx
 }
 
-export { dayKey, uid }
-export type { CoachMode, Note }
+export { dayKey, uid, startOfWeek }
+export type { CoachMode, Note, JournalPhoto }

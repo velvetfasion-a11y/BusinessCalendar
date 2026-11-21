@@ -114,21 +114,9 @@ export function CoachPage() {
 
   return (
     <div className="page coach-page">
-      <div className="coach-title-row">
-        <h1 className="page-title">AI Coach</h1>
-        <button
-          type="button"
-          className={`voice-chip ${voiceOn ? 'on' : ''}`}
-          onClick={() => {
-            if (voiceOn) stopSpeaking()
-            setVoiceOn((v) => !v)
-          }}
-        >
-          {voiceOn ? 'Voice on' : 'Voice off'}
-        </button>
-      </div>
+      <h1 className="page-title">AI Coach</h1>
 
-      <div className="segmented">
+      <div className="segmented ios">
         {COACH_MODES.map((m) => (
           <button
             key={m.id}
@@ -144,30 +132,34 @@ export function CoachPage() {
         ))}
       </div>
 
-      {llm.loading && (
-        <div className="coach-loading">
-          <div className="bar">
-            <div className="bar-fill" style={{ width: `${Math.max(llm.percent, 6)}%` }} />
-          </div>
-          <p>{llm.progress}</p>
-        </div>
-      )}
-      {!llm.loading && llm.backend === 'offline' && (
-        <p className="coach-hint">
-          Built-in Achieve coach
-          {llm.error ? ` — ${llm.error}` : ''}. Chrome/Edge + WebGPU for full WebLLM.
-        </p>
-      )}
-
       <div className="messages" ref={listRef}>
         {modeMessages.map((m) => (
-          <article key={m.id} className={`bubble ${m.role}`}>
+          <article
+            key={m.id}
+            className={`bubble ${m.role}`}
+            style={
+              m.role === 'user'
+                ? { background: store.accentHex, color: '#fff' }
+                : undefined
+            }
+          >
             <p>{m.content || (busy ? '…' : '')}</p>
           </article>
         ))}
       </div>
 
       <form className="composer native" onSubmit={(e) => void onSubmit(e)}>
+        <button
+          type="button"
+          className={`voice-dot ${voiceOn ? 'on' : ''}`}
+          title={voiceOn ? 'Voice on' : 'Voice off'}
+          onClick={() => {
+            if (voiceOn) stopSpeaking()
+            setVoiceOn((v) => !v)
+          }}
+        >
+          {voiceOn ? '🔊' : '🔇'}
+        </button>
         <textarea
           rows={1}
           value={input}

@@ -12,6 +12,7 @@ export function HabitsPage() {
   const [editTitle, setEditTitle] = useState('')
   const [newTitle, setNewTitle] = useState('')
   const [showAdd, setShowAdd] = useState(false)
+  const [reorder, setReorder] = useState(false)
 
   const progress = store.progressFor(selected)
   const todayKey = dayKey(new Date())
@@ -79,7 +80,7 @@ export function HabitsPage() {
         })}
       </div>
 
-      <div className="dream-head">
+      <div className="dream-head three">
         <h2>Dream ✨</h2>
         <button
           type="button"
@@ -93,42 +94,50 @@ export function HabitsPage() {
         >
           🗓️ {dayTitle}
         </button>
+        <button
+          type="button"
+          className="reorder-btn"
+          onClick={() => setReorder((v) => !v)}
+        >
+          {reorder ? 'Done' : 'Reorder'}
+        </button>
       </div>
 
       <div className="habit-list">
-        {store.habits.map((habit) => {
+        {store.habits.map((habit, index) => {
           const done = store.isHabitDone(habit, selected)
-          const editing = editingId === habit.id
           return (
             <div key={habit.id} className="habit-row">
-              {editing ? (
-                <form
-                  className="habit-edit"
-                  onSubmit={(e) => {
-                    e.preventDefault()
-                    store.updateHabitTitle(habit.id, editTitle)
-                    setEditingId(null)
-                  }}
-                >
-                  <input
-                    value={editTitle}
-                    onChange={(e) => setEditTitle(e.target.value)}
-                    autoFocus
-                  />
-                  <button type="submit">Save</button>
-                </form>
-              ) : (
-                <button
-                  type="button"
-                  className="habit-title"
-                  onClick={() => {
-                    setEditingId(habit.id)
-                    setEditTitle(habit.title)
-                  }}
-                >
-                  {habit.title}
-                </button>
+              {reorder && (
+                <div className="reorder-controls">
+                  <button
+                    type="button"
+                    disabled={index === 0}
+                    onClick={() => store.moveHabit(index, index - 1)}
+                    aria-label="Move up"
+                  >
+                    ↑
+                  </button>
+                  <button
+                    type="button"
+                    disabled={index === store.habits.length - 1}
+                    onClick={() => store.moveHabit(index, index + 1)}
+                    aria-label="Move down"
+                  >
+                    ↓
+                  </button>
+                </div>
               )}
+              <button
+                type="button"
+                className="habit-title"
+                onClick={() => {
+                  setEditingId(habit.id)
+                  setEditTitle(habit.title)
+                }}
+              >
+                {habit.title}
+              </button>
               <button
                 type="button"
                 className={`habit-toggle ${done ? 'done' : ''}`}
@@ -155,7 +164,7 @@ export function HabitsPage() {
         <div className="modal">
           <div className="modal-card">
             <h3>Add Habit</h3>
-            <p>Create your next Dream habit.</p>
+            <p className="empty-hint">Create your next Dream habit.</p>
             <input
               placeholder="Habit name"
               value={newTitle}
@@ -163,7 +172,13 @@ export function HabitsPage() {
               autoFocus
             />
             <div className="modal-actions">
-              <button type="button" onClick={() => { setShowAdd(false); setNewTitle('') }}>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowAdd(false)
+                  setNewTitle('')
+                }}
+              >
                 Cancel
               </button>
               <button
@@ -177,6 +192,35 @@ export function HabitsPage() {
                 }}
               >
                 Add
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {editingId && (
+        <div className="modal">
+          <div className="modal-card">
+            <h3>Edit</h3>
+            <input
+              value={editTitle}
+              onChange={(e) => setEditTitle(e.target.value)}
+              autoFocus
+            />
+            <div className="modal-actions">
+              <button type="button" onClick={() => setEditingId(null)}>
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="primary-btn"
+                style={{ background: store.accentHex }}
+                onClick={() => {
+                  store.updateHabitTitle(editingId, editTitle)
+                  setEditingId(null)
+                }}
+              >
+                Save
               </button>
             </div>
           </div>
