@@ -13,7 +13,8 @@ import type {
   ThemeId,
 } from './types'
 
-const STORAGE_KEY = 'achieve.luxury.v1'
+const STORAGE_KEY = 'achieve.luxury.v2'
+const LEGACY_KEYS = ['achieve.luxury.v1', 'achieve.web.v1', 'achieve.web.v2']
 
 function uid() {
   return crypto.randomUUID()
@@ -39,56 +40,36 @@ function startOfWeek(d: Date) {
 
 function defaults(): AppData {
   return {
-    habits: [
-      {
-        id: uid(),
-        title: 'Everything happens in my Favour',
-        symbol: '✨',
-        days: [0, 1, 2, 3, 4, 5, 6],
-        alarm: null,
-        completedDayKeys: [],
-      },
-    ],
+    habits: [],
     dayNotes: [],
-    reminders: [
-      {
-        id: uid(),
-        text: 'BIGGEST CLOTHING BRAND IN THE WORLD',
-        createdAt: new Date('2025-08-02T16:28:00').toISOString(),
-      },
-      {
-        id: uid(),
-        text: 'Things people will always need:',
-        createdAt: new Date('2025-08-02T15:10:00').toISOString(),
-      },
-      {
-        id: uid(),
-        text: 'EXCLUSIVE SINGER',
-        createdAt: new Date('2025-08-01T12:00:00').toISOString(),
-      },
-    ],
+    reminders: [],
     messages: [
       {
         id: uid(),
         role: 'assistant',
-        text: "Welcome back. ✨\nYou're tending 6 habits and you're 100% aligned today.\nWhat's on your mind?",
+        text: "Welcome. ✨\nI'm your Achieve coach.\nWhat's on your mind?",
       },
     ],
     theme: 'gold-dark',
-    profileName: 'Velvet Fasion',
-    messagesLeft: 174,
+    profileName: 'Guest',
+    messagesLeft: 200,
     messagesCap: 200,
     remindersOn: true,
     voiceId: 'Puck',
-    voiceSpeed: 13,
+    voiceSpeed: 50,
     planName: 'Secret plan',
   }
 }
 
 function load(): AppData {
   try {
+    // Wipe older demo datasets so the app always starts clean for v2.
+    for (const key of LEGACY_KEYS) localStorage.removeItem(key)
     const raw = localStorage.getItem(STORAGE_KEY)
-    if (raw) return { ...defaults(), ...JSON.parse(raw) }
+    if (raw) {
+      const parsed = JSON.parse(raw) as Partial<AppData>
+      return { ...defaults(), ...parsed }
+    }
   } catch {
     // ignore
   }
@@ -263,15 +244,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       const cur = new Date()
       cur.setHours(0, 0, 0, 0)
       while (true) {
-        if (progressFor(cur) >= 1 && habitsFor(cur).length > 0) streak += 1
-        else if (habitsFor(cur).length === 0) {
-          cur.setDate(cur.getDate() - 1)
-          continue
-        } else break
+        if (habitsFor(cur).length === 0) break
+        if (progressFor(cur) >= 1) streak += 1
+        else break
         cur.setDate(cur.getDate() - 1)
         if (streak > 365) break
       }
-      return streak || 1
+      return streak
     })(),
   }
 

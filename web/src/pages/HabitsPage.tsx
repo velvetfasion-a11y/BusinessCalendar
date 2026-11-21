@@ -7,11 +7,20 @@ const DAY_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
 function ProfileIcon() {
   return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7">
-      <circle cx="12" cy="8" r="3.2" />
-      <path d="M5.5 19c1.4-3 3.7-4.5 6.5-4.5S17.1 16 18.5 19" strokeLinecap="round" />
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
+      <circle cx="12" cy="8.2" r="3.1" />
+      <path d="M5.2 19.2c1.5-3.2 3.9-4.7 6.8-4.7s5.3 1.5 6.8 4.7" strokeLinecap="round" />
     </svg>
   )
+}
+
+function nextDays(from: Date, count: number) {
+  return Array.from({ length: count }, (_, i) => {
+    const d = new Date(from)
+    d.setDate(from.getDate() + i + 1)
+    d.setHours(0, 0, 0, 0)
+    return d
+  })
 }
 
 export function HabitsPage({ onProfile }: { onProfile: () => void }) {
@@ -29,8 +38,7 @@ export function HabitsPage({ onProfile }: { onProfile: () => void }) {
   const todayDone = todayHabits.filter((h) => store.isDone(h, today)).length
   const pct = Math.round(todayProgress * 100)
   const circumference = 2 * Math.PI * 72
-
-  const otherDays = store.weekDays.filter((d) => dayKey(d) !== dayKey(today))
+  const upcoming = nextDays(today, 6)
 
   return (
     <div className="page habits-page">
@@ -46,15 +54,17 @@ export function HabitsPage({ onProfile }: { onProfile: () => void }) {
         <div className="progress-ring">
           <svg viewBox="0 0 160 160">
             <circle className="track" cx="80" cy="80" r="72" />
-            <circle
-              className="fill"
-              cx="80"
-              cy="80"
-              r="72"
-              style={{
-                strokeDasharray: `${(pct / 100) * circumference} ${circumference}`,
-              }}
-            />
+            {pct > 0 && (
+              <circle
+                className="fill"
+                cx="80"
+                cy="80"
+                r="72"
+                style={{
+                  strokeDasharray: `${(pct / 100) * circumference} ${circumference}`,
+                }}
+              />
+            )}
           </svg>
           <div className="progress-center">
             <strong>{pct}</strong>
@@ -76,6 +86,12 @@ export function HabitsPage({ onProfile }: { onProfile: () => void }) {
       </div>
       <div className="gold-rule" />
 
+      {!store.habits.length && (
+        <p className="empty-habits-hint">
+          Tap <strong>+</strong> to add your first habit
+        </p>
+      )}
+
       <DayCard
         date={today}
         isToday
@@ -89,7 +105,7 @@ export function HabitsPage({ onProfile }: { onProfile: () => void }) {
       />
 
       <div className="day-grid">
-        {otherDays.map((d) => {
+        {upcoming.map((d) => {
           const habits = store.habitsFor(d)
           const done = habits.filter((h) => store.isDone(h, d)).length
           return (
@@ -174,52 +190,52 @@ function DayCard({
   isDone: (h: Habit) => boolean
   compact?: boolean
 }) {
-  const label = isToday
-    ? 'Today'
-    : date.toLocaleDateString('en-US', { weekday: 'short' }).toUpperCase()
+  const dayAbbr = DAY_SHORT[date.getDay()]
   const dateLabel = date.toLocaleDateString('en-GB', {
     day: 'numeric',
     month: 'short',
   })
 
   return (
-    <section className={`day-card ${isToday ? 'today' : ''}`}>
+    <section className={`day-card ${isToday ? 'today' : ''} ${compact ? 'compact' : ''}`}>
       <div className="day-head">
-        <span className="day-badge">{DAY_SHORT[date.getDay()].slice(0, 3)}</span>
-        <span className="title">{isToday ? 'Today' : label}</span>
-        {!compact && <span className="date">{dateLabel}</span>}
-        {compact && <span className="date">{dateLabel}</span>}
+        <span className="day-badge">{compact ? dayAbbr.slice(0, 3) : dayAbbr}</span>
+        {isToday ? (
+          <>
+            <span className="title">Today</span>
+            <span className="date">{dateLabel}</span>
+          </>
+        ) : (
+          <>
+            <span className="title">{dayAbbr.toUpperCase()}</span>
+            <span className="date">{dateLabel}</span>
+          </>
+        )}
         <span className="frac">
-          {doneCount}/{habits.length || 0}
+          {doneCount}/{habits.length}
         </span>
       </div>
 
       {habits.map((h) => {
         const done = isDone(h)
         return (
-          <div key={h.id} style={{ display: 'flex', gap: 4 }}>
-            <button
-              type="button"
-              className={`habit-pill ${done ? 'done' : ''}`}
-              onClick={() => onToggle(h.id)}
-              onContextMenu={(e) => {
-                e.preventDefault()
-                onEdit(h)
-              }}
-            >
-              <span className="sym">{h.symbol}</span>
-              <span className="label">{h.title}</span>
-              <span className={`check ${done ? 'on' : ''}`}>{done ? '✓' : ''}</span>
-            </button>
-          </div>
+          <button
+            key={h.id}
+            type="button"
+            className={`habit-pill ${done ? 'done' : ''}`}
+            onClick={() => onToggle(h.id)}
+            onContextMenu={(e) => {
+              e.preventDefault()
+              onEdit(h)
+            }}
+            onDoubleClick={() => onEdit(h)}
+          >
+            <span className="sym">{h.symbol}</span>
+            <span className="label">{h.title}</span>
+            <span className={`check ${done ? 'on' : ''}`}>{done ? '✓' : ''}</span>
+          </button>
         )
       })}
-
-      {!habits.length && (
-        <p style={{ color: 'var(--muted)', fontSize: 12, margin: '4px 0 8px' }}>
-          No habits this day
-        </p>
-      )}
 
       <textarea
         className="notes-field"

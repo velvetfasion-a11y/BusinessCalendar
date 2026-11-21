@@ -13,7 +13,7 @@
   --border-soft: rgba(201, 168, 76, 0.22);
   --danger: #c96b6b;
   --nav-bg: rgba(12, 12, 12, 0.82);
-  --serif: 'Cormorant Garamond', Georgia, serif;
+  --serif: 'Playfair Display', Georgia, serif;
   --sans: 'DM Sans', system-ui, sans-serif;
   color-scheme: dark;
 }
@@ -234,6 +234,17 @@ textarea {
   filter: drop-shadow(0 0 6px rgba(232, 193, 77, 0.45));
 }
 
+.empty-habits-hint {
+  text-align: center;
+  color: var(--muted);
+  font-size: 14px;
+  margin: 0 0 14px;
+}
+
+.empty-habits-hint strong {
+  color: var(--gold);
+}
+
 .progress-center {
   position: absolute;
   inset: 0;
@@ -335,13 +346,15 @@ textarea {
 .day-head .title {
   font-family: var(--serif);
   font-weight: 600;
-  font-size: 18px;
+  font-size: 20px;
 }
 
 .day-head .date {
   color: var(--muted);
   font-size: 13px;
+  font-weight: 400;
 }
+
 
 .day-head .frac {
   margin-left: auto;
@@ -370,7 +383,9 @@ textarea {
 
 .habit-pill .label {
   flex: 1;
-  font-size: 13px;
+  font-family: var(--serif);
+  font-size: 14px;
+  font-weight: 500;
   line-height: 1.25;
   min-width: 0;
   overflow: hidden;
