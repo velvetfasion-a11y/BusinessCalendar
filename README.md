@@ -1,18 +1,10 @@
-# BusinessCalendar / Achieve (web)
+# BusinessCalendar / Achieve
 
-Full **Achieve** app as a normal website — not just AI Coach.
+iOS app in `Achieve/` · **Live web app:** [velvetfasion-a11y.github.io/BusinessCalendar](https://velvetfasion-a11y.github.io/BusinessCalendar/)
 
-## Sections (same as iOS)
+## Web (browser)
 
-1. **Habits** (Achieve) — progress ring, week strip, Dream habits  
-2. **AI Coach** — Motivation / Routines / Energy + WebLLM / built-in coach + voice  
-3. **Journal** — notes to self  
-4. **Schedule** — month calendar + events  
-5. **Profile** — account, stats, accent, sticky notes  
-
-Floating bottom nav matches the iOS `FloatingNavBubble`.
-
-## Run
+Full Achieve shell: Habits · AI Coach · Journal · Schedule · Profile.
 
 ```bash
 cd web
@@ -20,4 +12,8 @@ npm install --onnxruntime-node-install-cuda=skip
 npm run dev
 ```
 
-Open in Chrome/Edge. Use WebGPU for full WebLLM on the AI Coach tab.
+Open in Chrome/Edge. WebGPU enables full WebLLM on the AI Coach tab; otherwise the built-in coach replies.
+
+## iOS
+
+Open `Achieve.xcodeproj` in Xcode.
