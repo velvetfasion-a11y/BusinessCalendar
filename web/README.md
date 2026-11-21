@@ -1,18 +1,22 @@
-# Achieve AI Coach (web)
+# Achieve AI Coach engine (web sources)
 
-Browser version of the Achieve / BusinessCalendar **AI Coach** — Motivation, Routines, and Energy — running fully client-side.
+Source for the **in-app** AI Coach tab in Achieve / BusinessCalendar — not a separate product.
 
-- **WebLLM** for local chat replies (WebGPU)
-- **Kokoro TTS** for spoken answers (`kokoro-js` / Kokoro-82M)
-- **Web Speech API** fallback if Kokoro cannot load
-- No backend
+- WebLLM for local replies
+- Kokoro TTS (Web Speech fallback)
+- UI matches the existing AI Coach screen (title, Motivation / Routines / Energy, chat, send)
 
-## Run
+## Preview in browser
 
 ```bash
-cd web
 npm install --onnxruntime-node-install-cuda=skip
 npm run dev
 ```
 
-Open in Chrome or Edge (WebGPU required).
+## Sync into the iOS app
+
+```bash
+./scripts/sync-coach-web.sh
+```
+
+Copies `dist/` → `../Achieve/CoachWeb` for the in-app `WKWebView`.

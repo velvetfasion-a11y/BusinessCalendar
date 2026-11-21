@@ -1,17 +1,22 @@
 # BusinessCalendar
 
-Exact copy of [Achieve](https://github.com/velvetfasion-a11y/Achieve) (SwiftUI iOS app), plus a web build of the same **AI Coach**.
+Exact copy of [Achieve](https://github.com/velvetfasion-a11y/Achieve) (SwiftUI), with the existing **AI Coach** tab powered by local WebLLM + Kokoro inside the app.
 
-## iOS (Achieve)
+## AI Coach (in-app)
 
-Open `Achieve.xcodeproj` in Xcode. The AI Coach tab uses Motivation / Routines / Energy modes.
+The floating nav **AI Coach** section is unchanged in placement. It now hosts the coach engine (WebLLM chat + Kokoro speech) in a `WKWebView` served from bundled `Achieve/CoachWeb` — not a separate product.
 
-## Web — Achieve AI Coach
+Modes remain **Motivation / Routines / Energy**, same as before.
 
-Same coach modes, powered by WebLLM + Kokoro in the browser. See [`web/README.md`](web/README.md).
+### Build the coach web bundle (required before Xcode)
 
 ```bash
 cd web
-npm install --onnxruntime-node-install-cuda=skip
-npm run dev
+./scripts/sync-coach-web.sh
 ```
+
+Then open `Achieve.xcodeproj` in Xcode and run on a device/simulator with WebGPU-capable WebKit.
+
+## Web sources
+
+`web/` is only the source for that in-app engine (and a browser preview via `npm run dev`). It is not a standalone app.

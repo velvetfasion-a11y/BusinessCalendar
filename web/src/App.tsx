@@ -10,10 +10,8 @@ import { loadLlm, streamChat, type ChatMessage } from './lib/llm'
 import {
   COACH_MODES,
   DEFAULT_LLM_MODEL,
-  LLM_MODELS,
   coachModeById,
   type CoachModeId,
-  type LlmModelId,
 } from './lib/models'
 import { initTts, speak, stopSpeaking, type TtsStatus } from './lib/tts'
 import type { LlmStatus } from './lib/llm'
@@ -31,14 +29,13 @@ function greetingMessage(mode: CoachModeId): ChatMessage {
   }
 }
 
+/** In-app Achieve AI Coach (same screen as iOS AICoachView). */
 export default function App() {
-  const [phase, setPhase] = useState<'boot' | 'chat'>('boot')
-  const [modelId, setModelId] = useState<LlmModelId>(DEFAULT_LLM_MODEL)
   const [mode, setMode] = useState<CoachModeId>('motivation')
   const [llm, setLlm] = useState<LlmStatus>({
     ready: false,
-    loading: false,
-    progress: 'Waiting…',
+    loading: true,
+    progress: 'Starting WebLLM…',
     percent: 0,
     error: null,
     modelId: null,
@@ -46,8 +43,8 @@ export default function App() {
   const [tts, setTts] = useState<TtsStatus>({
     engine: 'none',
     ready: false,
-    loading: false,
-    progress: 'Waiting…',
+    loading: true,
+    progress: 'Starting voice…',
     error: null,
   })
   const [voiceOn, setVoiceOn] = useState(true)
@@ -57,9 +54,9 @@ export default function App() {
   const [input, setInput] = useState('')
   const [busy, setBusy] = useState(false)
   const [speakingId, setSpeakingId] = useState<string | null>(null)
-  const [bootError, setBootError] = useState<string | null>(null)
   const listRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
+  const booted = useRef(false)
 
   const modeMessages = useMemo(
     () => messages.filter((m) => m.mode === mode),
@@ -75,19 +72,25 @@ export default function App() {
 
   useEffect(() => () => stopSpeaking(), [])
 
-  async function start() {
-    setBootError(null)
-    setLlm((s) => ({ ...s, loading: true, error: null }))
-    try {
-      await loadLlm(modelId, setLlm)
-      const ttsStatus = await initTts(setTts)
-      if (!ttsStatus.ready) setVoiceOn(false)
-      setPhase('chat')
-      requestAnimationFrame(() => inputRef.current?.focus())
-    } catch (err) {
-      setBootError(err instanceof Error ? err.message : String(err))
-    }
-  }
+  useEffect(() => {
+    if (booted.current) return
+    booted.current = true
+    void (async () => {
+      try {
+        await loadLlm(DEFAULT_LLM_MODEL, setLlm)
+        const status = await initTts(setTts)
+        if (!status.ready) setVoiceOn(false)
+        requestAnimationFrame(() => inputRef.current?.focus())
+      } catch (err) {
+        setLlm((s) => ({
+          ...s,
+          loading: false,
+          ready: false,
+          error: err instanceof Error ? err.message : String(err),
+        }))
+      }
+    })()
+  }, [])
 
   async function speakMessage(id: string, text: string) {
     if (!voiceOn) return
@@ -95,7 +98,7 @@ export default function App() {
     try {
       await speak(text, tts.engine === 'kokoro' ? 'kokoro' : 'webspeech')
     } catch {
-      // ignore playback errors in UI flow
+      // ignore
     } finally {
       setSpeakingId((current) => (current === id ? null : current))
     }
@@ -152,112 +155,34 @@ export default function App() {
     }
   }
 
-  if (phase === 'boot') {
-    return (
-      <div className="shell boot">
-        <div className="atmosphere" aria-hidden />
-        <main className="hero">
-          <p className="eyebrow">Achieve · BusinessCalendar</p>
-          <p className="brand">AI Coach</p>
-          <h1>Your local coach that talks back</h1>
-          <p className="lede">
-            Same Motivation, Routines, and Energy coach as Achieve — now powered
-            by WebLLM in your browser, with Kokoro reading replies aloud. No
-            server.
-          </p>
-
-          <label className="field">
-            <span>Model</span>
-            <select
-              value={modelId}
-              onChange={(e) => setModelId(e.target.value as LlmModelId)}
-              disabled={llm.loading || tts.loading}
-            >
-              {LLM_MODELS.map((m) => (
-                <option key={m.id} value={m.id}>
-                  {m.label} — {m.hint}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          <div className="cta-row">
-            <button
-              type="button"
-              className="primary"
-              onClick={() => void start()}
-              disabled={llm.loading || tts.loading}
-            >
-              {llm.loading || tts.loading ? 'Loading…' : 'Start AI Coach'}
-            </button>
-            <p className="fine">
-              Needs WebGPU (Chrome/Edge). Model weights download to your device
-              on first run.
-            </p>
-          </div>
-
-          {(llm.loading || tts.loading || llm.ready) && (
-            <div className="progress-block" role="status">
-              <div className="bar">
-                <div
-                  className="bar-fill"
-                  style={{
-                    width: `${Math.max(llm.percent, tts.loading ? 8 : 0)}%`,
-                  }}
-                />
-              </div>
-              <p>{llm.progress}</p>
-              <p className="muted">{tts.progress}</p>
-            </div>
-          )}
-
-          {(bootError || llm.error) && (
-            <p className="error">{bootError || llm.error}</p>
-          )}
-        </main>
-      </div>
-    )
-  }
+  const loading = llm.loading || tts.loading || !llm.ready
 
   return (
-    <div className="shell chat">
-      <div className="atmosphere soft" aria-hidden />
-      <header className="top">
-        <div className="top-brand">
-          <span className="brand mark">AI Coach</span>
-          <span className="pill">Achieve</span>
-        </div>
-        <div className="top-actions">
-          <button
-            type="button"
-            className={`toggle ${voiceOn ? 'on' : ''}`}
-            onClick={() => {
-              if (voiceOn) stopSpeaking()
-              setVoiceOn((v) => !v)
-            }}
-            aria-pressed={voiceOn}
-          >
-            {voiceOn
-              ? tts.engine === 'kokoro'
-                ? 'Voice: Kokoro'
-                : 'Voice: Web Speech'
-              : 'Voice off'}
-          </button>
-        </div>
+    <div className="shell coach-screen">
+      <header className="coach-title">
+        <h1>AI Coach</h1>
+        <button
+          type="button"
+          className={`voice-chip ${voiceOn ? 'on' : ''}`}
+          onClick={() => {
+            if (voiceOn) stopSpeaking()
+            setVoiceOn((v) => !v)
+          }}
+          aria-pressed={voiceOn}
+          disabled={loading && !tts.ready}
+        >
+          {voiceOn ? 'Voice on' : 'Voice off'}
+        </button>
       </header>
 
-      <div
-        className="modes"
-        role="tablist"
-        aria-label="Coach mode"
-      >
+      <div className="segmented" role="tablist" aria-label="Coach mode">
         {COACH_MODES.map((m) => (
           <button
             key={m.id}
             type="button"
             role="tab"
             aria-selected={mode === m.id}
-            className={`mode ${mode === m.id ? 'active' : ''}`}
+            className={mode === m.id ? 'active' : ''}
             onClick={() => {
               stopSpeaking()
               setMode(m.id)
@@ -268,50 +193,50 @@ export default function App() {
         ))}
       </div>
 
+      {loading && (
+        <div className="coach-loading" role="status">
+          <div className="bar">
+            <div
+              className="bar-fill"
+              style={{ width: `${Math.max(llm.percent, 6)}%` }}
+            />
+          </div>
+          <p>{llm.progress}</p>
+          <p className="muted">{tts.progress}</p>
+          {llm.error && <p className="error">{llm.error}</p>}
+        </div>
+      )}
+
       <div className="messages" ref={listRef}>
         {modeMessages.map((m) => (
           <article
             key={m.id}
             className={`bubble ${m.role} ${speakingId === m.id ? 'speaking' : ''}`}
           >
-            <header>
-              {m.role === 'user' ? 'You' : 'AI Coach'}
-              {m.role === 'assistant' && m.content && (
-                <button
-                  type="button"
-                  className="speak-again"
-                  onClick={() => void speakMessage(m.id, m.content)}
-                  disabled={!voiceOn}
-                >
-                  Speak
-                </button>
-              )}
-            </header>
             <p>{m.content || (busy ? '…' : '')}</p>
           </article>
         ))}
       </div>
 
-      <form className="composer" onSubmit={(e) => void onSubmit(e)}>
+      <form className="composer native" onSubmit={(e) => void onSubmit(e)}>
         <textarea
           ref={inputRef}
           rows={1}
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={onKeyDown}
-          placeholder="Ask anything…"
-          disabled={busy}
+          placeholder="Ask anything..."
+          disabled={busy || !llm.ready}
         />
         <button
           type="submit"
-          className="primary send"
-          disabled={busy || !input.trim()}
+          className="send-circle"
+          disabled={busy || !llm.ready || !input.trim()}
+          aria-label="Send"
         >
-          Send
+          {busy ? '…' : '↑'}
         </button>
       </form>
-
-      {tts.error && <p className="toast">{tts.error}</p>}
     </div>
   )
 }
