@@ -1,4 +1,6 @@
 import { coachModeById, type CoachModeId, type LlmModelId } from './models'
+import { probeEnvironment } from './gpu'
+import { offlineCoachReply } from './offlineCoach'
 
 export type ChatMessage = {
   id: string
@@ -7,6 +9,8 @@ export type ChatMessage = {
   mode: CoachModeId
 }
 
+export type LlmBackend = 'webllm' | 'offline'
+
 export type LlmStatus = {
   ready: boolean
   loading: boolean
@@ -14,6 +18,7 @@ export type LlmStatus = {
   percent: number
   error: string | null
   modelId: string | null
+  backend: LlmBackend
 }
 
 type Engine = {
@@ -31,26 +36,47 @@ type Engine = {
 
 let engine: Engine | null = null
 let loadedModel: string | null = null
+let backend: LlmBackend = 'offline'
 
-export function getEngine() {
-  return engine
+export function getBackend() {
+  return backend
 }
 
 export async function loadLlm(
   modelId: LlmModelId,
   onProgress?: (status: LlmStatus) => void,
-): Promise<Engine> {
+): Promise<LlmBackend> {
   onProgress?.({
     ready: false,
     loading: true,
-    progress: 'Starting WebLLM…',
+    progress: 'Checking browser…',
     percent: 0,
     error: null,
     modelId,
+    backend: 'webllm',
   })
 
+  const env = await probeEnvironment()
+  if (!env.supported) {
+    backend = 'offline'
+    engine = null
+    loadedModel = null
+    onProgress?.({
+      ready: true,
+      loading: false,
+      progress: 'Built-in Achieve coach ready',
+      percent: 100,
+      error: env.reason,
+      modelId: null,
+      backend: 'offline',
+    })
+    return 'offline'
+  }
+
   try {
-    const { CreateMLCEngine } = await import('@mlc-ai/web-llm')
+    const { CreateMLCEngine, CreateWebWorkerMLCEngine } = await import(
+      '@mlc-ai/web-llm'
+    )
 
     const initProgressCallback = (report: {
       progress?: number
@@ -64,51 +90,65 @@ export async function loadLlm(
         percent,
         error: null,
         modelId,
+        backend: 'webllm',
       })
     }
 
     if (engine && loadedModel === modelId) {
+      backend = 'webllm'
       onProgress?.({
         ready: true,
         loading: false,
-        progress: 'Model already loaded',
+        progress: 'WebLLM ready',
         percent: 100,
         error: null,
         modelId,
+        backend: 'webllm',
       })
-      return engine
+      return 'webllm'
     }
 
-    if (engine && loadedModel !== modelId) {
-      await engine.reload(modelId)
-      loadedModel = modelId
-    } else {
+    try {
+      const worker = new Worker(
+        new URL('../worker/webllm.worker.ts', import.meta.url),
+        { type: 'module' },
+      )
+      engine = (await CreateWebWorkerMLCEngine(worker, modelId, {
+        initProgressCallback,
+      })) as unknown as Engine
+    } catch {
       engine = (await CreateMLCEngine(modelId, {
         initProgressCallback,
       })) as unknown as Engine
-      loadedModel = modelId
     }
 
+    loadedModel = modelId
+    backend = 'webllm'
     onProgress?.({
       ready: true,
       loading: false,
-      progress: 'Achieve AI Coach ready',
+      progress: 'WebLLM ready',
       percent: 100,
       error: null,
       modelId,
+      backend: 'webllm',
     })
-    return engine
+    return 'webllm'
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
+    backend = 'offline'
+    engine = null
+    loadedModel = null
     onProgress?.({
-      ready: false,
+      ready: true,
       loading: false,
-      progress: 'Failed',
-      percent: 0,
-      error: message,
-      modelId,
+      progress: 'Built-in Achieve coach ready',
+      percent: 100,
+      error: `WebLLM unavailable (${message}). Using built-in Achieve coach replies.`,
+      modelId: null,
+      backend: 'offline',
     })
-    throw err
+    return 'offline'
   }
 }
 
@@ -117,7 +157,15 @@ export async function streamChat(
   mode: CoachModeId,
   onToken: (fullText: string) => void,
 ): Promise<string> {
-  if (!engine) throw new Error('WebLLM is not loaded yet')
+  const lastUser = [...history].reverse().find((m) => m.role === 'user')
+  const userText = lastUser?.content ?? ''
+
+  if (backend !== 'webllm' || !engine) {
+    // Simulate a short stream so the UI feels alive.
+    const reply = offlineCoachReply(userText, mode)
+    onToken(reply)
+    return reply
+  }
 
   const modeConfig = coachModeById(mode)
   const messages = [
@@ -128,20 +176,31 @@ export async function streamChat(
       .map((m) => ({ role: m.role, content: m.content })),
   ]
 
-  const chunks = await engine.chat.completions.create({
-    messages,
-    stream: true,
-    temperature: 0.7,
-    max_tokens: 512,
-  })
+  try {
+    const chunks = await engine.chat.completions.create({
+      messages,
+      stream: true,
+      temperature: 0.7,
+      max_tokens: 512,
+    })
 
-  let full = ''
-  for await (const chunk of chunks) {
-    const delta = chunk.choices[0]?.delta?.content ?? ''
-    if (delta) {
-      full += delta
+    let full = ''
+    for await (const chunk of chunks) {
+      const delta = chunk.choices[0]?.delta?.content ?? ''
+      if (delta) {
+        full += delta
+        onToken(full)
+      }
+    }
+    if (!full.trim()) {
+      full = offlineCoachReply(userText, mode)
       onToken(full)
     }
+    return full
+  } catch (err) {
+    const reply = offlineCoachReply(userText, mode)
+    onToken(reply)
+    console.warn('WebLLM chat failed, using offline coach', err)
+    return reply
   }
-  return full
 }

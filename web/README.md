@@ -1,22 +1,14 @@
-# Achieve AI Coach engine (web sources)
+# Achieve AI Coach (website)
 
-Source for the **in-app** AI Coach tab in Achieve / BusinessCalendar — not a separate product.
-
-- WebLLM for local replies
-- Kokoro TTS (Web Speech fallback)
-- UI matches the existing AI Coach screen (title, Motivation / Routines / Energy, chat, send)
-
-## Preview in browser
+Normal website — open in any modern browser. Same AI Coach UI as Achieve.
 
 ```bash
 npm install --onnxruntime-node-install-cuda=skip
 npm run dev
 ```
 
-## Sync into the iOS app
+- **WebLLM** when WebGPU is available (Chrome/Edge)
+- **Built-in Achieve coach** replies as fallback so chat always works
+- **Kokoro TTS** + Web Speech fallback
 
-```bash
-./scripts/sync-coach-web.sh
-```
-
-Copies `dist/` → `../Achieve/CoachWeb` for the in-app `WKWebView`.
+Deploy the `dist/` folder (after `npm run build`) to any static host. Keep COOP/COEP headers (`public/_headers` / `vercel.json`).

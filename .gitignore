@@ -1,5 +1,5 @@
-
-# Built coach web (regenerate with web/scripts/sync-coach-web.sh)
-Achieve/CoachWeb/assets/*.wasm
-web/dist/
 web/node_modules/
+web/dist/
+web/dist-ssr/
+*.local
+.DS_Store

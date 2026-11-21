@@ -6,7 +6,7 @@ import {
   type FormEvent,
   type KeyboardEvent,
 } from 'react'
-import { loadLlm, streamChat, type ChatMessage } from './lib/llm'
+import { loadLlm, streamChat, type ChatMessage, type LlmStatus } from './lib/llm'
 import {
   COACH_MODES,
   DEFAULT_LLM_MODEL,
@@ -14,7 +14,6 @@ import {
   type CoachModeId,
 } from './lib/models'
 import { initTts, speak, stopSpeaking, type TtsStatus } from './lib/tts'
-import type { LlmStatus } from './lib/llm'
 
 function uid() {
   return crypto.randomUUID()
@@ -29,16 +28,17 @@ function greetingMessage(mode: CoachModeId): ChatMessage {
   }
 }
 
-/** In-app Achieve AI Coach (same screen as iOS AICoachView). */
+/** Achieve AI Coach — normal website, same look as the in-app coach. */
 export default function App() {
   const [mode, setMode] = useState<CoachModeId>('motivation')
   const [llm, setLlm] = useState<LlmStatus>({
     ready: false,
     loading: true,
-    progress: 'Starting WebLLM…',
+    progress: 'Starting…',
     percent: 0,
     error: null,
     modelId: null,
+    backend: 'offline',
   })
   const [tts, setTts] = useState<TtsStatus>({
     engine: 'none',
@@ -75,22 +75,18 @@ export default function App() {
   useEffect(() => {
     if (booted.current) return
     booted.current = true
-    void (async () => {
-      try {
-        await loadLlm(DEFAULT_LLM_MODEL, setLlm)
-        const status = await initTts(setTts)
-        if (!status.ready) setVoiceOn(false)
-        requestAnimationFrame(() => inputRef.current?.focus())
-      } catch (err) {
-        setLlm((s) => ({
-          ...s,
-          loading: false,
-          ready: false,
-          error: err instanceof Error ? err.message : String(err),
-        }))
-      }
-    })()
+    void boot()
   }, [])
+
+  async function boot() {
+    setLlm((s) => ({ ...s, loading: true, error: null }))
+    // Voice can init in parallel; never block chat on TTS.
+    void initTts(setTts).then((status) => {
+      if (!status.ready) setVoiceOn(false)
+    })
+    await loadLlm(DEFAULT_LLM_MODEL, setLlm)
+    requestAnimationFrame(() => inputRef.current?.focus())
+  }
 
   async function speakMessage(id: string, text: string) {
     if (!voiceOn) return
@@ -155,7 +151,7 @@ export default function App() {
     }
   }
 
-  const loading = llm.loading || tts.loading || !llm.ready
+  const showLoader = llm.loading
 
   return (
     <div className="shell coach-screen">
@@ -169,7 +165,6 @@ export default function App() {
             setVoiceOn((v) => !v)
           }}
           aria-pressed={voiceOn}
-          disabled={loading && !tts.ready}
         >
           {voiceOn ? 'Voice on' : 'Voice off'}
         </button>
@@ -193,17 +188,30 @@ export default function App() {
         ))}
       </div>
 
-      {loading && (
+      {(showLoader || llm.error || llm.backend === 'offline') && (
         <div className="coach-loading" role="status">
-          <div className="bar">
-            <div
-              className="bar-fill"
-              style={{ width: `${Math.max(llm.percent, 6)}%` }}
-            />
-          </div>
-          <p>{llm.progress}</p>
-          <p className="muted">{tts.progress}</p>
-          {llm.error && <p className="error">{llm.error}</p>}
+          {showLoader && (
+            <>
+              <div className="bar">
+                <div
+                  className="bar-fill"
+                  style={{ width: `${Math.max(llm.percent, 6)}%` }}
+                />
+              </div>
+              <p>{llm.progress}</p>
+              <p className="muted">{tts.progress}</p>
+            </>
+          )}
+          {!showLoader && llm.backend === 'webllm' && (
+            <p className="ok">WebLLM running locally in your browser</p>
+          )}
+          {!showLoader && llm.backend === 'offline' && (
+            <p className="muted">
+              Using Achieve built-in coach
+              {llm.error ? ` — ${llm.error}` : ''}. For the full WebLLM model,
+              open in Chrome/Edge with WebGPU.
+            </p>
+          )}
         </div>
       )}
 
