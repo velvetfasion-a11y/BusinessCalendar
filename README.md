@@ -1,14 +1,14 @@
 # BusinessCalendar
 
-Exact copy of [Achieve](https://github.com/velvetfasion-a11y/Achieve) (SwiftUI iOS app) plus a client-side web assistant.
+Exact copy of [Achieve](https://github.com/velvetfasion-a11y/Achieve) (SwiftUI iOS app), plus a web build of the same **AI Coach**.
 
 ## iOS (Achieve)
 
-Open `Achieve.xcodeproj` in Xcode.
+Open `Achieve.xcodeproj` in Xcode. The AI Coach tab uses Motivation / Routines / Energy modes.
 
-## Web — Viska (WebLLM + Kokoro)
+## Web — Achieve AI Coach
 
-Private in-browser chat with spoken replies. See [`web/README.md`](web/README.md).
+Same coach modes, powered by WebLLM + Kokoro in the browser. See [`web/README.md`](web/README.md).
 
 ```bash
 cd web

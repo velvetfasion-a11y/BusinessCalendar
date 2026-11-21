@@ -1,9 +1,10 @@
-import { SYSTEM_PROMPT, type LlmModelId } from './models'
+import { coachModeById, type CoachModeId, type LlmModelId } from './models'
 
 export type ChatMessage = {
   id: string
   role: 'user' | 'assistant' | 'system'
   content: string
+  mode: CoachModeId
 }
 
 export type LlmStatus = {
@@ -19,9 +20,11 @@ type Engine = {
   reload: (modelId: string) => Promise<void>
   chat: {
     completions: {
-      create: (opts: Record<string, unknown>) => Promise<AsyncIterable<{
-        choices: Array<{ delta?: { content?: string } }>
-      }>>
+      create: (opts: Record<string, unknown>) => Promise<
+        AsyncIterable<{
+          choices: Array<{ delta?: { content?: string } }>
+        }>
+      >
     }
   }
 }
@@ -40,7 +43,7 @@ export async function loadLlm(
   onProgress?.({
     ready: false,
     loading: true,
-    progress: 'Startar WebLLM…',
+    progress: 'Starting WebLLM…',
     percent: 0,
     error: null,
     modelId,
@@ -49,12 +52,15 @@ export async function loadLlm(
   try {
     const { CreateMLCEngine } = await import('@mlc-ai/web-llm')
 
-    const initProgressCallback = (report: { progress?: number; text?: string }) => {
+    const initProgressCallback = (report: {
+      progress?: number
+      text?: string
+    }) => {
       const percent = Math.round((report.progress ?? 0) * 100)
       onProgress?.({
         ready: false,
         loading: true,
-        progress: report.text || `Laddar modell ${percent}%`,
+        progress: report.text || `Loading model ${percent}%`,
         percent,
         error: null,
         modelId,
@@ -65,7 +71,7 @@ export async function loadLlm(
       onProgress?.({
         ready: true,
         loading: false,
-        progress: 'Modell redan laddad',
+        progress: 'Model already loaded',
         percent: 100,
         error: null,
         modelId,
@@ -86,7 +92,7 @@ export async function loadLlm(
     onProgress?.({
       ready: true,
       loading: false,
-      progress: 'WebLLM redo',
+      progress: 'Achieve AI Coach ready',
       percent: 100,
       error: null,
       modelId,
@@ -97,7 +103,7 @@ export async function loadLlm(
     onProgress?.({
       ready: false,
       loading: false,
-      progress: 'Misslyckades',
+      progress: 'Failed',
       percent: 0,
       error: message,
       modelId,
@@ -108,13 +114,16 @@ export async function loadLlm(
 
 export async function streamChat(
   history: ChatMessage[],
+  mode: CoachModeId,
   onToken: (fullText: string) => void,
 ): Promise<string> {
-  if (!engine) throw new Error('WebLLM är inte laddad ännu')
+  if (!engine) throw new Error('WebLLM is not loaded yet')
 
+  const modeConfig = coachModeById(mode)
   const messages = [
-    { role: 'system' as const, content: SYSTEM_PROMPT },
+    { role: 'system' as const, content: modeConfig.system },
     ...history
+      .filter((m) => m.mode === mode)
       .filter((m) => m.role === 'user' || m.role === 'assistant')
       .map((m) => ({ role: m.role, content: m.content })),
   ]

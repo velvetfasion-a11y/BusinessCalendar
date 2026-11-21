@@ -26,7 +26,7 @@ async function loadKokoro(onProgress?: ProgressCallback) {
     engine: 'kokoro',
     ready: false,
     loading: true,
-    progress: 'Laddar Kokoro TTS…',
+    progress: 'Loading Kokoro TTS…',
     error: null,
   })
 
@@ -77,7 +77,7 @@ export async function initTts(onProgress?: ProgressCallback): Promise<TtsStatus>
       engine: 'kokoro',
       ready: true,
       loading: false,
-      progress: 'Kokoro TTS redo',
+      progress: 'Kokoro TTS ready',
       error: null,
     }
     onProgress?.(status)
@@ -91,9 +91,9 @@ export async function initTts(onProgress?: ProgressCallback): Promise<TtsStatus>
       ready: hasSpeech,
       loading: false,
       progress: hasSpeech
-        ? 'Web Speech API som fallback'
-        : 'Ingen TTS tillgänglig',
-      error: `Kokoro misslyckades (${message}). Använder Web Speech om det går.`,
+        ? 'Using Web Speech API fallback'
+        : 'No TTS available',
+      error: `Kokoro failed (${message}). Falling back to Web Speech when possible.`,
     }
     onProgress?.(status)
     return status
@@ -134,7 +134,7 @@ function playBlob(blob: Blob): Promise<void> {
 function speakWithWebSpeech(text: string): Promise<void> {
   return new Promise((resolve, reject) => {
     if (!('speechSynthesis' in window)) {
-      reject(new Error('Web Speech API saknas'))
+      reject(new Error('Web Speech API missing'))
       return
     }
     stopSpeaking()
@@ -142,7 +142,7 @@ function speakWithWebSpeech(text: string): Promise<void> {
     utter.lang = /[åäöÅÄÖ]/.test(text) ? 'sv-SE' : 'en-US'
     utter.rate = 1
     utter.onend = () => resolve()
-    utter.onerror = () => reject(new Error('Web Speech misslyckades'))
+    utter.onerror = () => reject(new Error('Web Speech failed'))
     window.speechSynthesis.speak(utter)
   })
 }
@@ -172,5 +172,5 @@ export async function speak(
     return 'webspeech'
   }
 
-  throw new Error('Ingen TTS-motor tillgänglig')
+  throw new Error('No TTS engine available')
 }

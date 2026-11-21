@@ -1,12 +1,20 @@
 import {
   useEffect,
+  useMemo,
   useRef,
   useState,
   type FormEvent,
   type KeyboardEvent,
 } from 'react'
 import { loadLlm, streamChat, type ChatMessage } from './lib/llm'
-import { DEFAULT_LLM_MODEL, LLM_MODELS, type LlmModelId } from './lib/models'
+import {
+  COACH_MODES,
+  DEFAULT_LLM_MODEL,
+  LLM_MODELS,
+  coachModeById,
+  type CoachModeId,
+  type LlmModelId,
+} from './lib/models'
 import { initTts, speak, stopSpeaking, type TtsStatus } from './lib/tts'
 import type { LlmStatus } from './lib/llm'
 
@@ -14,13 +22,23 @@ function uid() {
   return crypto.randomUUID()
 }
 
+function greetingMessage(mode: CoachModeId): ChatMessage {
+  return {
+    id: uid(),
+    role: 'assistant',
+    mode,
+    content: coachModeById(mode).greeting,
+  }
+}
+
 export default function App() {
   const [phase, setPhase] = useState<'boot' | 'chat'>('boot')
   const [modelId, setModelId] = useState<LlmModelId>(DEFAULT_LLM_MODEL)
+  const [mode, setMode] = useState<CoachModeId>('motivation')
   const [llm, setLlm] = useState<LlmStatus>({
     ready: false,
     loading: false,
-    progress: 'Väntar…',
+    progress: 'Waiting…',
     percent: 0,
     error: null,
     modelId: null,
@@ -29,11 +47,13 @@ export default function App() {
     engine: 'none',
     ready: false,
     loading: false,
-    progress: 'Väntar…',
+    progress: 'Waiting…',
     error: null,
   })
   const [voiceOn, setVoiceOn] = useState(true)
-  const [messages, setMessages] = useState<ChatMessage[]>([])
+  const [messages, setMessages] = useState<ChatMessage[]>(() =>
+    COACH_MODES.map((m) => greetingMessage(m.id)),
+  )
   const [input, setInput] = useState('')
   const [busy, setBusy] = useState(false)
   const [speakingId, setSpeakingId] = useState<string | null>(null)
@@ -41,12 +61,17 @@ export default function App() {
   const listRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
 
+  const modeMessages = useMemo(
+    () => messages.filter((m) => m.mode === mode),
+    [messages, mode],
+  )
+
   useEffect(() => {
     listRef.current?.scrollTo({
       top: listRef.current.scrollHeight,
       behavior: 'smooth',
     })
-  }, [messages, busy])
+  }, [modeMessages, busy])
 
   useEffect(() => () => stopSpeaking(), [])
 
@@ -56,9 +81,7 @@ export default function App() {
     try {
       await loadLlm(modelId, setLlm)
       const ttsStatus = await initTts(setTts)
-      if (!ttsStatus.ready) {
-        setVoiceOn(false)
-      }
+      if (!ttsStatus.ready) setVoiceOn(false)
       setPhase('chat')
       requestAnimationFrame(() => inputRef.current?.focus())
     } catch (err) {
@@ -83,19 +106,24 @@ export default function App() {
     const text = input.trim()
     if (!text || busy || !llm.ready) return
 
-    const userMsg: ChatMessage = { id: uid(), role: 'user', content: text }
+    const userMsg: ChatMessage = {
+      id: uid(),
+      role: 'user',
+      mode,
+      content: text,
+    }
     const assistantId = uid()
     const nextHistory = [...messages, userMsg]
     setMessages([
       ...nextHistory,
-      { id: assistantId, role: 'assistant', content: '' },
+      { id: assistantId, role: 'assistant', mode, content: '' },
     ])
     setInput('')
     setBusy(true)
     stopSpeaking()
 
     try {
-      const reply = await streamChat(nextHistory, (full) => {
+      const reply = await streamChat(nextHistory, mode, (full) => {
         setMessages((prev) =>
           prev.map((m) =>
             m.id === assistantId ? { ...m, content: full } : m,
@@ -109,9 +137,7 @@ export default function App() {
       const message = err instanceof Error ? err.message : String(err)
       setMessages((prev) =>
         prev.map((m) =>
-          m.id === assistantId
-            ? { ...m, content: `Fel: ${message}` }
-            : m,
+          m.id === assistantId ? { ...m, content: `Error: ${message}` } : m,
         ),
       )
     } finally {
@@ -131,15 +157,17 @@ export default function App() {
       <div className="shell boot">
         <div className="atmosphere" aria-hidden />
         <main className="hero">
-          <p className="brand">Viska</p>
-          <h1>Lokal AI som pratar tillbaka</h1>
+          <p className="eyebrow">Achieve · BusinessCalendar</p>
+          <p className="brand">AI Coach</p>
+          <h1>Your local coach that talks back</h1>
           <p className="lede">
-            WebLLM kör modellen i din webbläsare. Kokoro läser upp svaret —
-            helt utan server.
+            Same Motivation, Routines, and Energy coach as Achieve — now powered
+            by WebLLM in your browser, with Kokoro reading replies aloud. No
+            server.
           </p>
 
           <label className="field">
-            <span>Modell</span>
+            <span>Model</span>
             <select
               value={modelId}
               onChange={(e) => setModelId(e.target.value as LlmModelId)}
@@ -160,11 +188,11 @@ export default function App() {
               onClick={() => void start()}
               disabled={llm.loading || tts.loading}
             >
-              {llm.loading || tts.loading ? 'Laddar…' : 'Starta lokalt'}
+              {llm.loading || tts.loading ? 'Loading…' : 'Start AI Coach'}
             </button>
             <p className="fine">
-              Kräver WebGPU (Chrome/Edge). Första gången laddas modellvikter till
-              din enhet.
+              Needs WebGPU (Chrome/Edge). Model weights download to your device
+              on first run.
             </p>
           </div>
 
@@ -173,7 +201,9 @@ export default function App() {
               <div className="bar">
                 <div
                   className="bar-fill"
-                  style={{ width: `${Math.max(llm.percent, tts.loading ? 8 : 0)}%` }}
+                  style={{
+                    width: `${Math.max(llm.percent, tts.loading ? 8 : 0)}%`,
+                  }}
                 />
               </div>
               <p>{llm.progress}</p>
@@ -194,10 +224,8 @@ export default function App() {
       <div className="atmosphere soft" aria-hidden />
       <header className="top">
         <div className="top-brand">
-          <span className="brand mark">Viska</span>
-          <span className="pill">
-            {llm.modelId?.split('-').slice(0, 2).join(' ') ?? 'WebLLM'}
-          </span>
+          <span className="brand mark">AI Coach</span>
+          <span className="pill">Achieve</span>
         </div>
         <div className="top-actions">
           <button
@@ -211,27 +239,43 @@ export default function App() {
           >
             {voiceOn
               ? tts.engine === 'kokoro'
-                ? 'Röst: Kokoro'
-                : 'Röst: Web Speech'
-              : 'Röst av'}
+                ? 'Voice: Kokoro'
+                : 'Voice: Web Speech'
+              : 'Voice off'}
           </button>
         </div>
       </header>
 
+      <div
+        className="modes"
+        role="tablist"
+        aria-label="Coach mode"
+      >
+        {COACH_MODES.map((m) => (
+          <button
+            key={m.id}
+            type="button"
+            role="tab"
+            aria-selected={mode === m.id}
+            className={`mode ${mode === m.id ? 'active' : ''}`}
+            onClick={() => {
+              stopSpeaking()
+              setMode(m.id)
+            }}
+          >
+            {m.title}
+          </button>
+        ))}
+      </div>
+
       <div className="messages" ref={listRef}>
-        {messages.length === 0 && (
-          <div className="empty">
-            <p className="brand whisper">Viska</p>
-            <p>Skriv något — svaret genereras lokalt och kan läsas upp.</p>
-          </div>
-        )}
-        {messages.map((m) => (
+        {modeMessages.map((m) => (
           <article
             key={m.id}
             className={`bubble ${m.role} ${speakingId === m.id ? 'speaking' : ''}`}
           >
             <header>
-              {m.role === 'user' ? 'Du' : 'Viska'}
+              {m.role === 'user' ? 'You' : 'AI Coach'}
               {m.role === 'assistant' && m.content && (
                 <button
                   type="button"
@@ -239,7 +283,7 @@ export default function App() {
                   onClick={() => void speakMessage(m.id, m.content)}
                   disabled={!voiceOn}
                 >
-                  Läs upp
+                  Speak
                 </button>
               )}
             </header>
@@ -255,11 +299,15 @@ export default function App() {
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={onKeyDown}
-          placeholder="Skriv ett meddelande…"
+          placeholder="Ask anything…"
           disabled={busy}
         />
-        <button type="submit" className="primary send" disabled={busy || !input.trim()}>
-          Skicka
+        <button
+          type="submit"
+          className="primary send"
+          disabled={busy || !input.trim()}
+        >
+          Send
         </button>
       </form>
 
