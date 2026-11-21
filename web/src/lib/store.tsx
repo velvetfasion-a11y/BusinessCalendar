@@ -1,28 +1,25 @@
 import {
   createContext,
+  useCallback,
   useContext,
   useMemo,
   useState,
-  useCallback,
   type ReactNode,
 } from 'react'
 import type {
   AppData,
-  CalendarEvent,
-  CoachMode,
+  ChatMessage,
   Habit,
-  JournalPhoto,
-  Note,
+  ThemeId,
 } from './types'
 
-const STORAGE_KEY = 'achieve.web.v2'
-const DEFAULT_ACCENT = '#3F2A6B'
+const STORAGE_KEY = 'achieve.luxury.v1'
 
 function uid() {
   return crypto.randomUUID()
 }
 
-function dayKey(d: Date) {
+export function dayKey(d: Date) {
   const x = new Date(d)
   x.setHours(0, 0, 0, 0)
   const y = x.getFullYear()
@@ -40,66 +37,87 @@ function startOfWeek(d: Date) {
   return x
 }
 
+function defaults(): AppData {
+  return {
+    habits: [
+      {
+        id: uid(),
+        title: 'Everything happens in my Favour',
+        symbol: '✨',
+        days: [0, 1, 2, 3, 4, 5, 6],
+        alarm: null,
+        completedDayKeys: [],
+      },
+    ],
+    dayNotes: [],
+    reminders: [
+      {
+        id: uid(),
+        text: 'BIGGEST CLOTHING BRAND IN THE WORLD',
+        createdAt: new Date('2025-08-02T16:28:00').toISOString(),
+      },
+      {
+        id: uid(),
+        text: 'Things people will always need:',
+        createdAt: new Date('2025-08-02T15:10:00').toISOString(),
+      },
+      {
+        id: uid(),
+        text: 'EXCLUSIVE SINGER',
+        createdAt: new Date('2025-08-01T12:00:00').toISOString(),
+      },
+    ],
+    messages: [
+      {
+        id: uid(),
+        role: 'assistant',
+        text: "Welcome back. ✨\nYou're tending 6 habits and you're 100% aligned today.\nWhat's on your mind?",
+      },
+    ],
+    theme: 'gold-dark',
+    profileName: 'Velvet Fasion',
+    messagesLeft: 174,
+    messagesCap: 200,
+    remindersOn: true,
+    voiceId: 'Puck',
+    voiceSpeed: 13,
+    planName: 'Secret plan',
+  }
+}
+
 function load(): AppData {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
-    if (raw) {
-      const parsed = JSON.parse(raw) as Partial<AppData>
-      return {
-        habits: parsed.habits ?? [
-          { id: uid(), title: 'Drink water', completedDayKeys: [] },
-        ],
-        notes: parsed.notes ?? [],
-        photos: parsed.photos ?? [],
-        events: (parsed.events ?? []).map((e) => ({
-          ...e,
-          duration: e.duration ?? '1h',
-          isPinned: e.isPinned ?? false,
-          category: e.category ?? 'work',
-        })),
-        accentHex: parsed.accentHex ?? DEFAULT_ACCENT,
-        profileName: parsed.profileName ?? 'Guest',
-        profileEmail: parsed.profileEmail ?? null,
-        signedIn: parsed.signedIn ?? false,
-      }
-    }
+    if (raw) return { ...defaults(), ...JSON.parse(raw) }
   } catch {
     // ignore
   }
-  return {
-    habits: [{ id: uid(), title: 'Drink water', completedDayKeys: [] }],
-    notes: [],
-    photos: [],
-    events: [],
-    accentHex: DEFAULT_ACCENT,
-    profileName: 'Guest',
-    profileEmail: null,
-    signedIn: false,
-  }
+  return defaults()
 }
 
 type Store = AppData & {
   weekDays: Date[]
+  habitsFor: (d: Date) => Habit[]
   progressFor: (d: Date) => number
-  isHabitDone: (habit: Habit, d: Date) => boolean
+  isDone: (habit: Habit, d: Date) => boolean
   toggleHabit: (id: string, d: Date) => void
-  addHabit: (title: string) => void
-  updateHabitTitle: (id: string, title: string) => void
-  moveHabit: (from: number, to: number) => void
-  addNote: (text: string) => void
-  deleteNote: (id: string) => void
-  addPhoto: (dataUrl: string, comment: string) => void
-  deletePhoto: (id: string) => void
-  addEvent: (e: Omit<CalendarEvent, 'id'>) => void
-  deleteEvent: (id: string) => void
-  eventsOn: (d: Date) => CalendarEvent[]
-  setAccent: (hex: string) => void
-  signIn: (name: string, email?: string) => void
-  signOut: () => void
+  addHabit: (h: Omit<Habit, 'id' | 'completedDayKeys'>) => void
+  updateHabit: (id: string, patch: Partial<Habit>) => void
+  deleteHabit: (id: string) => void
+  setDayNote: (dateKey: string, text: string) => void
+  dayNote: (dateKey: string) => string
+  addReminder: (text: string) => void
+  updateReminder: (id: string, text: string) => void
+  deleteReminder: (id: string) => void
+  addMessage: (m: Omit<ChatMessage, 'id'>) => void
+  clearChat: () => void
+  setTheme: (t: ThemeId) => void
+  setRemindersOn: (on: boolean) => void
+  setVoice: (id: string) => void
+  setVoiceSpeed: (n: number) => void
   resetAll: () => void
-  lifetimeScore: number
+  weekCompletedCount: number
   streakCount: number
-  loginStateText: string
 }
 
 const Ctx = createContext<Store | null>(null)
@@ -121,23 +139,31 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     })
   }, [])
 
-  const progressFor = useCallback(
+  const habitsFor = useCallback(
     (d: Date) => {
-      if (!data.habits.length) return 0
-      const key = dayKey(d)
-      const done = data.habits.filter((h) =>
-        h.completedDayKeys.includes(key),
-      ).length
-      return done / data.habits.length
+      const wd = d.getDay()
+      return data.habits.filter((h) => h.days.includes(wd))
     },
     [data.habits],
+  )
+
+  const progressFor = useCallback(
+    (d: Date) => {
+      const list = habitsFor(d)
+      if (!list.length) return 0
+      const key = dayKey(d)
+      const done = list.filter((h) => h.completedDayKeys.includes(key)).length
+      return done / list.length
+    },
+    [habitsFor],
   )
 
   const store: Store = {
     ...data,
     weekDays,
+    habitsFor,
     progressFor,
-    isHabitDone: (habit, d) => habit.completedDayKeys.includes(dayKey(d)),
+    isDone: (habit, d) => habit.completedDayKeys.includes(dayKey(d)),
     toggleHabit: (id, d) => {
       const key = dayKey(d)
       persist({
@@ -154,122 +180,99 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         }),
       })
     },
-    addHabit: (title) => {
-      const t = title.trim()
-      if (!t) return
+    addHabit: (h) =>
       persist({
         ...data,
-        habits: [...data.habits, { id: uid(), title: t, completedDayKeys: [] }],
-      })
-    },
-    updateHabitTitle: (id, title) => {
-      const t = title.trim()
-      if (!t) return
+        habits: [
+          ...data.habits,
+          { ...h, id: uid(), completedDayKeys: [] },
+        ],
+      }),
+    updateHabit: (id, patch) =>
       persist({
         ...data,
-        habits: data.habits.map((h) => (h.id === id ? { ...h, title: t } : h)),
+        habits: data.habits.map((h) => (h.id === id ? { ...h, ...patch } : h)),
+      }),
+    deleteHabit: (id) =>
+      persist({ ...data, habits: data.habits.filter((h) => h.id !== id) }),
+    setDayNote: (dateKey, text) => {
+      const others = data.dayNotes.filter((n) => n.dateKey !== dateKey)
+      persist({
+        ...data,
+        dayNotes: text.trim()
+          ? [...others, { dateKey, text }]
+          : others,
       })
     },
-    moveHabit: (from, to) => {
-      const habits = [...data.habits]
-      const [item] = habits.splice(from, 1)
-      habits.splice(to, 0, item)
-      persist({ ...data, habits })
-    },
-    addNote: (text) => {
+    dayNote: (key) => data.dayNotes.find((n) => n.dateKey === key)?.text ?? '',
+    addReminder: (text) => {
       const t = text.trim()
       if (!t) return
       persist({
         ...data,
-        notes: [
+        reminders: [
           { id: uid(), text: t, createdAt: new Date().toISOString() },
-          ...data.notes,
+          ...data.reminders,
         ],
       })
     },
-    deleteNote: (id) =>
-      persist({ ...data, notes: data.notes.filter((n) => n.id !== id) }),
-    addPhoto: (dataUrl, comment) =>
+    updateReminder: (id, text) =>
       persist({
         ...data,
-        photos: [
+        reminders: data.reminders.map((r) =>
+          r.id === id ? { ...r, text: text.trim() || r.text } : r,
+        ),
+      }),
+    deleteReminder: (id) =>
+      persist({
+        ...data,
+        reminders: data.reminders.filter((r) => r.id !== id),
+      }),
+    addMessage: (m) =>
+      persist({
+        ...data,
+        messages: [...data.messages, { ...m, id: uid() }],
+        messagesLeft: Math.max(0, data.messagesLeft - (m.role === 'user' ? 1 : 0)),
+      }),
+    clearChat: () =>
+      persist({
+        ...data,
+        messages: [
           {
             id: uid(),
-            dataUrl,
-            comment: comment.trim(),
-            createdAt: new Date().toISOString(),
+            role: 'assistant',
+            text: "Welcome back. ✨\nWhat's on your mind?",
           },
-          ...data.photos,
         ],
       }),
-    deletePhoto: (id) =>
-      persist({ ...data, photos: data.photos.filter((p) => p.id !== id) }),
-    addEvent: (e) =>
-      persist({
-        ...data,
-        events: [...data.events, { ...e, id: uid() }],
-      }),
-    deleteEvent: (id) =>
-      persist({ ...data, events: data.events.filter((e) => e.id !== id) }),
-    eventsOn: (d) =>
-      data.events
-        .filter((e) => e.dateKey === dayKey(d))
-        .sort(
-          (a, b) =>
-            a.startHour * 60 +
-            a.startMinute -
-            (b.startHour * 60 + b.startMinute),
-        ),
-    setAccent: (hex) => persist({ ...data, accentHex: hex }),
-    signIn: (name, email) =>
-      persist({
-        ...data,
-        signedIn: true,
-        profileName: name.trim() || 'You',
-        profileEmail: email?.trim() || null,
-      }),
-    signOut: () =>
-      persist({
-        ...data,
-        signedIn: false,
-        profileName: 'Guest',
-        profileEmail: null,
-      }),
-    resetAll: () =>
-      persist({
-        habits: [{ id: uid(), title: 'Drink water', completedDayKeys: [] }],
-        notes: [],
-        photos: [],
-        events: [],
-        accentHex: DEFAULT_ACCENT,
-        profileName: 'Guest',
-        profileEmail: null,
-        signedIn: false,
-      }),
-    lifetimeScore: (() => {
-      const keys = new Set(data.habits.flatMap((h) => h.completedDayKeys))
-      if (!keys.size) return Math.round(progressFor(new Date()) * 100)
-      let sum = 0
-      keys.forEach((k) => {
-        const done = data.habits.filter((h) =>
-          h.completedDayKeys.includes(k),
-        ).length
-        sum += data.habits.length ? done / data.habits.length : 0
-      })
-      return Math.round((sum / keys.size) * 100)
-    })(),
+    setTheme: (t) => persist({ ...data, theme: t }),
+    setRemindersOn: (on) => persist({ ...data, remindersOn: on }),
+    setVoice: (id) => persist({ ...data, voiceId: id }),
+    setVoiceSpeed: (n) => persist({ ...data, voiceSpeed: n }),
+    resetAll: () => persist(defaults()),
+    weekCompletedCount: weekDays.reduce((sum, d) => {
+      const list = habitsFor(d)
+      const key = dayKey(d)
+      return (
+        sum +
+        list.filter((h) => h.completedDayKeys.includes(key)).length
+      )
+    }, 0),
     streakCount: (() => {
       let streak = 0
       const cur = new Date()
       cur.setHours(0, 0, 0, 0)
       while (true) {
-        if (progressFor(cur) >= 0.8) streak += 1
-        else break
+        if (progressFor(cur) >= 1 && habitsFor(cur).length > 0) streak += 1
+        else if (habitsFor(cur).length === 0) {
+          cur.setDate(cur.getDate() - 1)
+          continue
+        } else break
         cur.setDate(cur.getDate() - 1)
+        if (streak > 365) break
       }
-      return streak
+      return streak || 1
     })(),
-    loginStateText: data.signedIn ? 'Signed in' : 'Not signed in',
   }
 
   return <Ctx.Provider value={store}>{children}</Ctx.Provider>
@@ -281,5 +284,4 @@ export function useStore() {
   return ctx
 }
 
-export { dayKey, uid, startOfWeek }
-export type { CoachMode, Note, JournalPhoto }
+export { uid }
