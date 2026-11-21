@@ -9,9 +9,10 @@ import { Paywall } from './pages/Paywall'
 
 function IconHabits() {
   return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-      <path d="M7 8h10M7 12h10M7 16h7" strokeLinecap="round" />
-      <rect x="4" y="4" width="16" height="16" rx="3" />
+    <svg viewBox="0 0 24 24" fill="currentColor">
+      <rect x="4" y="5" width="9" height="9" rx="1.5" opacity="0.95" />
+      <rect x="9" y="9" width="9" height="9" rx="1.5" opacity="0.7" />
+      <rect x="11.5" y="11.5" width="8.5" height="8.5" rx="1.5" opacity="0.45" />
     </svg>
   )
 }
