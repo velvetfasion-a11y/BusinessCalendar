@@ -106,9 +106,12 @@ const Ctx = createContext<Store | null>(null)
 export function StoreProvider({ children }: { children: ReactNode }) {
   const [data, setData] = useState<AppData>(() => load())
 
-  const persist = useCallback((next: AppData) => {
-    setData(next)
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(next))
+  const persist = useCallback((next: AppData | ((prev: AppData) => AppData)) => {
+    setData((prev) => {
+      const resolved = typeof next === 'function' ? next(prev) : next
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(resolved))
+      return resolved
+    })
   }, [])
 
   const weekDays = useMemo(() => {
@@ -210,17 +213,20 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         reminders: data.reminders.filter((r) => r.id !== id),
       }),
     addMessage: (m) =>
-      persist({
-        ...data,
-        messages: [...data.messages, { ...m, id: uid() }],
-        messagesLeft: Math.max(0, data.messagesLeft - (m.role === 'user' ? 1 : 0)),
-      }),
-    clearChat: () => persist({ ...data, messages: [] }),
+      persist((prev) => ({
+        ...prev,
+        messages: [...prev.messages, { ...m, id: uid() }],
+        messagesLeft: Math.max(
+          0,
+          prev.messagesLeft - (m.role === 'user' ? 1 : 0),
+        ),
+      })),
+    clearChat: () => persist((prev) => ({ ...prev, messages: [] })),
     seedWelcome: (text) =>
-      persist({
-        ...data,
+      persist((prev) => ({
+        ...prev,
         messages: [{ id: uid(), role: 'assistant', text }],
-      }),
+      })),
     setTheme: (t) => persist({ ...data, theme: t }),
     setRemindersOn: (on) => persist({ ...data, remindersOn: on }),
     setVoice: (id) => persist({ ...data, voiceId: id }),

@@ -66,18 +66,6 @@ function SendIcon() {
   )
 }
 
-function buildCtx(store: ReturnType<typeof useStore>): CoachContext {
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
-  return {
-    habitCount: store.habits.length,
-    todayPercent: Math.round(store.progressFor(today) * 100),
-    habitTitles: store.habits.map((h) => h.title),
-    streak: store.streakCount,
-    profileName: store.profileName,
-  }
-}
-
 export function ChatPage({
   onProfile,
   onPaywall,
@@ -110,14 +98,26 @@ export function ChatPage({
   const listRef = useRef<HTMLDivElement>(null)
   const booted = useRef(false)
 
-  const ctx = useMemo(
-    () => buildCtx(store),
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- primitives only
+  const todayPercent = store.progressFor(
+    (() => {
+      const d = new Date()
+      d.setHours(0, 0, 0, 0)
+      return d
+    })(),
+  )
+  const ctx = useMemo<CoachContext>(
+    () => ({
+      habitCount: store.habits.length,
+      todayPercent: Math.round(todayPercent * 100),
+      habitTitles: store.habits.map((h) => h.title),
+      streak: store.streakCount,
+      profileName: store.profileName,
+    }),
     [
       store.habits,
       store.profileName,
       store.streakCount,
-      store.progressFor,
+      todayPercent,
     ],
   )
 
@@ -155,9 +155,14 @@ export function ChatPage({
 
   useEffect(() => () => stopSpeaking(), [])
 
-  async function onSubmit(e?: FormEvent) {
+  async function onSubmit(e?: FormEvent<HTMLFormElement>) {
     e?.preventDefault()
-    const text = input.trim()
+    const form = e?.currentTarget
+    const raw = form
+      ? new FormData(form).get('coach-input')
+      : null
+    const fromDom = typeof raw === 'string' ? raw : ''
+    const text = (fromDom || input).trim()
     if (!text || busy) return
     setInput('')
     store.addMessage({ role: 'user', text })
@@ -278,11 +283,13 @@ export function ChatPage({
 
       <form className="composer" onSubmit={(e) => void onSubmit(e)}>
         <input
+          name="coach-input"
           value={input}
           onChange={(e) => setInput(e.target.value)}
           placeholder="Ask me anything..."
           disabled={busy}
           aria-label="Message"
+          autoComplete="off"
         />
         <button type="button" className="circle" aria-label="Voice input" disabled>
           <MicIcon />
@@ -290,7 +297,7 @@ export function ChatPage({
         <button
           type="submit"
           className="circle send"
-          disabled={busy || !input.trim()}
+          disabled={busy}
           aria-label="Send"
         >
           <SendIcon />
