@@ -8,25 +8,15 @@ export default defineConfig({
   build: {
     outDir: process.env.GITHUB_PAGES === '1' ? '../docs' : 'dist',
     emptyOutDir: true,
+    target: 'es2022',
+    cssMinify: true,
+    modulePreload: { polyfill: false },
   },
   server: {
-    headers: {
-      'Cross-Origin-Opener-Policy': 'same-origin',
-      'Cross-Origin-Embedder-Policy': 'credentialless',
-    },
     host: '127.0.0.1',
     port: 5173,
   },
   preview: {
-    headers: {
-      'Cross-Origin-Opener-Policy': 'same-origin',
-      'Cross-Origin-Embedder-Policy': 'credentialless',
-    },
-  },
-  worker: {
-    format: 'es',
-  },
-  optimizeDeps: {
-    exclude: ['@mlc-ai/web-llm', 'kokoro-js'],
+    host: '127.0.0.1',
   },
 })

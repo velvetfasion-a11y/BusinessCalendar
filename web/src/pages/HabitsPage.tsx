@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { dayKey, useStore } from '../lib/store'
 import { HABIT_SYMBOLS, type Habit } from '../lib/types'
 import { EditHabitSheet } from './EditHabitSheet'
@@ -43,7 +43,15 @@ function isoWeekNumber(d: Date) {
   )
 }
 
-export function HabitsPage({ onProfile }: { onProfile: () => void }) {
+export function HabitsPage({
+  onProfile,
+  createOpen,
+  onCreateOpenChange,
+}: {
+  onProfile: () => void
+  createOpen: boolean
+  onCreateOpenChange: (open: boolean) => void
+}) {
   const store = useStore()
   const today = useMemo(() => {
     const d = new Date()
@@ -52,7 +60,9 @@ export function HabitsPage({ onProfile }: { onProfile: () => void }) {
   }, [])
   const [focus, setFocus] = useState(today)
   const [editHabit, setEditHabit] = useState<Habit | null>(null)
-  const [creating, setCreating] = useState(false)
+  const [compactHero, setCompactHero] = useState(false)
+  const pageRef = useRef<HTMLDivElement>(null)
+  const creating = createOpen
 
   const viewingToday = sameDay(focus, today)
   const todayProgress = store.progressFor(today)
@@ -65,42 +75,54 @@ export function HabitsPage({ onProfile }: { onProfile: () => void }) {
 
   const weekNumber = useMemo(() => isoWeekNumber(focus), [focus])
 
+  useEffect(() => {
+    const scroller = pageRef.current?.closest('.page-host')
+    if (!(scroller instanceof HTMLElement)) return
+    const onScroll = () => setCompactHero(scroller.scrollTop > 56)
+    onScroll()
+    scroller.addEventListener('scroll', onScroll, { passive: true })
+    return () => scroller.removeEventListener('scroll', onScroll)
+  }, [])
+
   function shiftWeek(dir: -1 | 1) {
     setFocus((f) => addDays(f, dir * 7))
   }
 
   return (
-    <div className="page habits-page">
-      <div className="top-row">
+    <div className={`page habits-page ${compactHero ? 'compact-hero' : ''}`} ref={pageRef}>
+      <div className="top-row habits-top">
         <span style={{ width: 36 }} />
-        <h1 className="brand-title">Achieve</h1>
+        {!compactHero && <h1 className="brand-title">Achieve</h1>}
+        {compactHero && <span className="habits-top-spacer" />}
         <button type="button" className="profile-btn" onClick={onProfile} aria-label="Account">
           <ProfileIcon />
         </button>
       </div>
 
-      <div className="progress-wrap">
-        <div className="progress-ring">
-          <svg viewBox="0 0 160 160">
-            <circle className="track" cx="80" cy="80" r="72" />
-            {pct > 0 && (
-              <circle
-                className="fill"
-                cx="80"
-                cy="80"
-                r="72"
-                style={{
-                  strokeDasharray: `${(pct / 100) * circumference} ${circumference}`,
-                }}
-              />
-            )}
-          </svg>
-          <div className="progress-center">
-            <strong>{pct}</strong>
-            <span>TODAY</span>
+      {!compactHero && (
+        <div className="progress-wrap">
+          <div className="progress-ring">
+            <svg viewBox="0 0 160 160">
+              <circle className="track" cx="80" cy="80" r="72" />
+              {pct > 0 && (
+                <circle
+                  className="fill"
+                  cx="80"
+                  cy="80"
+                  r="72"
+                  style={{
+                    strokeDasharray: `${(pct / 100) * circumference} ${circumference}`,
+                  }}
+                />
+              )}
+            </svg>
+            <div className="progress-center">
+              <strong>{pct}</strong>
+              <span>TODAY</span>
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
       <div className="stats-row with-nav">
         <button type="button" className="week-chevron" onClick={() => shiftWeek(-1)} aria-label="Previous week">
@@ -168,21 +190,12 @@ export function HabitsPage({ onProfile }: { onProfile: () => void }) {
         })}
       </div>
 
-      <button
-        type="button"
-        className="fab"
-        aria-label="Add habit"
-        onClick={() => setCreating(true)}
-      >
-        +
-      </button>
-
       {(editHabit || creating) && (
         <EditHabitSheet
           habit={editHabit}
           onClose={() => {
             setEditHabit(null)
-            setCreating(false)
+            onCreateOpenChange(false)
           }}
           onSave={(patch) => {
             if (editHabit) store.updateHabit(editHabit.id, patch)
@@ -194,7 +207,7 @@ export function HabitsPage({ onProfile }: { onProfile: () => void }) {
                 alarm: patch.alarm ?? null,
               })
             setEditHabit(null)
-            setCreating(false)
+            onCreateOpenChange(false)
           }}
           onDelete={
             editHabit
@@ -248,7 +261,7 @@ function DayCard({
       style={onOpen ? { cursor: 'pointer' } : undefined}
     >
       <div className="day-head">
-        <span className="day-badge">{dayAbbr}</span>
+        <span className="day-badge">{dayAbbr.slice(0, 3)}</span>
         {isToday ? (
           <>
             <span className="title">Today</span>

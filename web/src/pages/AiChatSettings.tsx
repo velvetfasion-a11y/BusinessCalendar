@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { VOICES } from '../lib/types'
 import { useStore } from '../lib/store'
 import { previewVoice, stopSpeaking } from '../lib/tts'
+import { ShellPortal } from '../lib/portal'
 
 export function AiChatSettings({
   onClose,
@@ -33,6 +34,7 @@ export function AiChatSettings({
   }
 
   return (
+    <ShellPortal>
     <div className="sheet-backdrop" onClick={onClose}>
       <div className="sheet" onClick={(e) => e.stopPropagation()}>
         <div className="grabber" />
@@ -116,5 +118,6 @@ export function AiChatSettings({
         </button>
       </div>
     </div>
+    </ShellPortal>
   )
 }
