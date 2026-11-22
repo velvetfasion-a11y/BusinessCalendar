@@ -280,10 +280,7 @@ function DayCard({
             <span className="date">{dateLabel}</span>
           </>
         ) : compact ? (
-          <>
-            <span className="title">{dayAbbr.toUpperCase()}</span>
-            <span className="date">{dateLabel}</span>
-          </>
+          <span className="title">{dateLabel}</span>
         ) : (
           <span className="title">
             {dayAbbr} {dateLabel}

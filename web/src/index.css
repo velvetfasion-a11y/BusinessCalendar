@@ -125,8 +125,8 @@ textarea {
 }
 
 .app-shell {
-  --nav-clearance: calc(88px + env(safe-area-inset-bottom, 0px));
-  --fab-clearance: calc(100px + env(safe-area-inset-bottom, 0px));
+  --nav-clearance: calc(96px + env(safe-area-inset-bottom, 0px));
+  --fab-clearance: calc(112px + env(safe-area-inset-bottom, 0px));
   width: 100%;
   max-width: 430px;
   height: 100%;
@@ -145,14 +145,26 @@ textarea {
 .page-host {
   flex: 1;
   min-height: 0;
-  overflow: auto;
+  overflow-x: hidden;
+  overflow-y: auto;
   padding: 8px 14px var(--nav-clearance);
   -webkit-overflow-scrolling: touch;
   overscroll-behavior: contain;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .page-host.tab-habits {
-  padding-bottom: calc(128px + env(safe-area-inset-bottom, 0px));
+  padding-bottom: calc(140px + env(safe-area-inset-bottom, 0px));
+}
+
+.page,
+.habits-page {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  overflow-x: hidden;
 }
 
 .page-host.tab-chat {
@@ -389,6 +401,10 @@ textarea {
   border-radius: 20px;
   padding: 10px;
   margin-bottom: 8px;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+  overflow: hidden;
 }
 
 .day-card.today {
@@ -398,54 +414,70 @@ textarea {
 .day-head {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   margin-bottom: 10px;
+  min-width: 0;
 }
 
 .day-badge {
-  width: 28px;
+  min-width: 30px;
   height: 28px;
+  padding: 0 7px;
   border-radius: 999px;
   background: var(--gold);
   color: #0d0d0d;
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 700;
   display: grid;
   place-items: center;
   flex-shrink: 0;
+  box-sizing: border-box;
 }
 
 .day-head .title {
   font-family: var(--serif);
   font-weight: 600;
   font-size: 20px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .day-head .date {
   color: var(--muted);
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 400;
+  flex-shrink: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
-
 
 .day-head .frac {
   margin-left: auto;
   color: var(--muted);
-  font-size: 13px;
+  font-size: 12px;
+  flex-shrink: 0;
 }
 
 .habit-pill {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   background: var(--bg-inset);
   border-radius: 999px;
   padding: 8px 10px;
   margin-bottom: 6px;
   border: none;
   width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
   text-align: left;
   cursor: pointer;
+  overflow: hidden;
 }
 
 .habit-pill .sym {
@@ -490,6 +522,8 @@ textarea {
 .notes-field {
   margin-top: 6px;
   width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
   border: 1px solid var(--border-soft);
   background: var(--bg-inset);
   border-radius: 12px;
@@ -507,29 +541,53 @@ textarea {
 
 .day-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 8px;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .day-grid .day-card {
   margin: 0;
-  padding: 10px;
+  padding: 8px;
+  min-width: 0;
+}
+
+.day-grid .day-head {
+  gap: 4px;
+  margin-bottom: 8px;
 }
 
 .day-grid .day-head .title {
-  font-size: 14px;
+  font-size: 13px;
+}
+
+.day-grid .day-head .date {
+  font-size: 11px;
+}
+
+.day-grid .habit-pill {
+  padding: 7px 8px;
 }
 
 .day-grid .habit-pill .label {
   font-size: 11px;
 }
 
+.day-grid .notes-field {
+  font-size: 14px;
+  min-height: 32px;
+  padding: 6px 8px;
+}
+
 .fab {
   position: absolute;
-  right: 16px;
-  bottom: calc(76px + env(safe-area-inset-bottom, 0px));
-  width: 54px;
-  height: 54px;
+  right: 14px;
+  /* Sit fully above the nav pill (never over Note) */
+  bottom: calc(96px + env(safe-area-inset-bottom, 0px));
+  width: 52px;
+  height: 52px;
   border: none;
   border-radius: 999px;
   background: linear-gradient(145deg, var(--gold-bright), var(--gold));
@@ -540,7 +598,6 @@ textarea {
   box-shadow: 0 0 16px rgba(212, 175, 55, 0.35);
   z-index: 45;
   touch-action: manipulation;
-  /* Never scroll with page content */
   pointer-events: auto;
 }
 
@@ -551,16 +608,15 @@ textarea {
   bottom: calc(10px + env(safe-area-inset-bottom, 0px));
   transform: translateX(-50%);
   display: flex;
-  gap: 2px;
-  padding: 7px 10px;
+  gap: 0;
+  padding: 6px 8px;
   border-radius: 999px;
   background: var(--nav-bg);
   border: 1px solid var(--border);
   z-index: 40;
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
-  max-width: calc(100% - 24px);
-  /* Single chrome layer — never duplicated into scroll content */
+  max-width: calc(100% - 88px);
   pointer-events: auto;
 }
 
@@ -571,7 +627,7 @@ textarea {
 }
 
 .nav-item {
-  width: 78px;
+  width: 68px;
   border: none;
   background: transparent;
   color: var(--muted);
@@ -579,7 +635,7 @@ textarea {
   flex-direction: column;
   align-items: center;
   gap: 3px;
-  padding: 6px 4px 4px;
+  padding: 6px 2px 4px;
   cursor: pointer;
   border-radius: 999px;
 }
