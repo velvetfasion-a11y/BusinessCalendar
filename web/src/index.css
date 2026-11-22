@@ -708,6 +708,20 @@ textarea {
   opacity: 0.35;
 }
 
+.composer .mic.hot {
+  background: rgba(201, 168, 76, 0.22);
+  border-color: var(--gold);
+  box-shadow: 0 0 0 3px rgba(201, 168, 76, 0.18);
+}
+
+.voice-hint {
+  margin: 0 0 8px;
+  text-align: center;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
 /* —— Notes / Positive Reminders —— */
 .notes-page .brand-title {
   font-size: 34px;

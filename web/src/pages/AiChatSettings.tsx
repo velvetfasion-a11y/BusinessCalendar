@@ -1,5 +1,7 @@
+import { useState } from 'react'
 import { VOICES } from '../lib/types'
 import { useStore } from '../lib/store'
+import { previewVoice, stopSpeaking } from '../lib/tts'
 
 export function AiChatSettings({
   onClose,
@@ -9,6 +11,26 @@ export function AiChatSettings({
   onPaywall: () => void
 }) {
   const store = useStore()
+  const [previewing, setPreviewing] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
+
+  async function onPickVoice(v: string) {
+    store.setVoice(v)
+    setError(null)
+    stopSpeaking()
+    setPreviewing(v)
+    try {
+      await previewVoice(v, store.voiceSpeed)
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : 'Could not play voice preview on this device.',
+      )
+    } finally {
+      setPreviewing(null)
+    }
+  }
 
   return (
     <div className="sheet-backdrop" onClick={onClose}>
@@ -43,9 +65,10 @@ export function AiChatSettings({
               key={v}
               type="button"
               className={store.voiceId === v ? 'on' : ''}
-              onClick={() => store.setVoice(v)}
+              disabled={previewing !== null}
+              onClick={() => void onPickVoice(v)}
             >
-              {v}
+              {previewing === v ? '…' : v}
             </button>
           ))}
         </div>
@@ -59,8 +82,27 @@ export function AiChatSettings({
         >
           Tap a voice to preview. Tap Listen on any coach reply to hear it.
         </p>
+        {error && (
+          <p
+            style={{
+              textAlign: 'center',
+              color: '#c9a07a',
+              fontSize: 12,
+              margin: '0 0 10px',
+            }}
+          >
+            {error}
+          </p>
+        )}
 
-        <button type="button" className="danger-btn" onClick={() => store.clearChat()}>
+        <button
+          type="button"
+          className="danger-btn"
+          onClick={() => {
+            stopSpeaking()
+            store.clearChat()
+          }}
+        >
           Clear chat
         </button>
         <button

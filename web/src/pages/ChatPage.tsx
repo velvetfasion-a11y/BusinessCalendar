@@ -1,5 +1,10 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { offlineCoachReply, welcomeMessage, type CoachContext } from '../lib/offlineCoach'
+import {
+  speechRecognitionSupported,
+  startListening,
+  stopListening,
+} from '../lib/stt'
 import { speak, stopSpeaking } from '../lib/tts'
 import { useStore } from '../lib/store'
 import { AiChatSettings } from './AiChatSettings'
@@ -77,9 +82,12 @@ export function ChatPage({
   const [showQuota, setShowQuota] = useState(true)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [listeningId, setListeningId] = useState<string | null>(null)
+  const [dictating, setDictating] = useState(false)
+  const [voiceHint, setVoiceHint] = useState<string | null>(null)
   const listRef = useRef<HTMLDivElement>(null)
   const seedWelcome = store.seedWelcome
   const messages = store.messages
+  const canDictate = speechRecognitionSupported()
 
   const habitCount = store.habits.length
   const habitTitlesKey = store.habits.map((h) => h.title).join('\0')
@@ -128,10 +136,18 @@ export function ChatPage({
     el.scrollTop = el.scrollHeight
   }, [store.messages.length, busy])
 
-  useEffect(() => () => stopSpeaking(), [])
+  useEffect(
+    () => () => {
+      stopSpeaking()
+      stopListening()
+    },
+    [],
+  )
 
   async function onSubmit(e?: FormEvent<HTMLFormElement>) {
     e?.preventDefault()
+    stopListening()
+    setDictating(false)
     const form = e?.currentTarget
     const raw = form ? new FormData(form).get('coach-input') : null
     const fromDom = typeof raw === 'string' ? raw : ''
@@ -151,14 +167,53 @@ export function ChatPage({
   }
 
   async function onListen(id: string, text: string) {
+    stopListening()
+    setDictating(false)
     stopSpeaking()
     setListeningId(id)
+    setVoiceHint(null)
     try {
-      // Lightweight browser TTS only — no Kokoro download on Chat open.
-      await speak(text, 'webspeech')
+      await speak(text, {
+        voiceId: store.voiceId,
+        speed: store.voiceSpeed,
+      })
+    } catch (err) {
+      setVoiceHint(
+        err instanceof Error
+          ? err.message
+          : 'Could not play audio on this device.',
+      )
     } finally {
       setListeningId(null)
     }
+  }
+
+  function toggleDictation() {
+    setVoiceHint(null)
+    if (dictating) {
+      stopListening()
+      setDictating(false)
+      return
+    }
+    if (!canDictate) {
+      setVoiceHint(
+        'Voice typing needs Chrome or Edge (Safari on iPhone doesn’t support it yet). You can still use Listen.',
+      )
+      return
+    }
+    stopSpeaking()
+    setDictating(true)
+    const ok = startListening({
+      lang: /[åäöÅÄÖ]/.test(input) ? 'sv-SE' : 'en-US',
+      onPartial: (text) => setInput(text),
+      onFinal: (text) => setInput(text),
+      onError: (message) => {
+        setVoiceHint(message)
+        setDictating(false)
+      },
+      onEnd: () => setDictating(false),
+    })
+    if (!ok) setDictating(false)
   }
 
   const displayMessages =
@@ -221,17 +276,26 @@ export function ChatPage({
         )}
       </div>
 
+      {voiceHint && <p className="voice-hint">{voiceHint}</p>}
+
       <form className="composer" onSubmit={(e) => void onSubmit(e)}>
         <input
           name="coach-input"
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          placeholder="Ask me anything..."
+          placeholder={dictating ? 'Listening…' : 'Ask me anything...'}
           disabled={busy}
           aria-label="Message"
           autoComplete="off"
         />
-        <button type="button" className="circle" aria-label="Voice input" disabled>
+        <button
+          type="button"
+          className={`circle mic ${dictating ? 'hot' : ''}`}
+          aria-label={dictating ? 'Stop voice input' : 'Voice input'}
+          aria-pressed={dictating}
+          disabled={busy}
+          onClick={toggleDictation}
+        >
           <MicIcon />
         </button>
         <button type="submit" className="circle send" disabled={busy} aria-label="Send">
