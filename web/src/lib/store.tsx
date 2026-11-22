@@ -3,6 +3,7 @@ import {
   useCallback,
   useContext,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from 'react'
@@ -62,7 +63,6 @@ function defaults(): AppData {
 
 function load(): AppData {
   try {
-    // Wipe older demo datasets so the app always starts clean for v2.
     for (const key of LEGACY_KEYS) localStorage.removeItem(key)
     const raw = localStorage.getItem(STORAGE_KEY)
     if (raw) {
@@ -105,11 +105,20 @@ const Ctx = createContext<Store | null>(null)
 
 export function StoreProvider({ children }: { children: ReactNode }) {
   const [data, setData] = useState<AppData>(() => load())
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const persist = useCallback((next: AppData | ((prev: AppData) => AppData)) => {
     setData((prev) => {
       const resolved = typeof next === 'function' ? next(prev) : next
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(resolved))
+      if (resolved === prev) return prev
+      if (saveTimer.current) clearTimeout(saveTimer.current)
+      saveTimer.current = setTimeout(() => {
+        try {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(resolved))
+        } catch {
+          // ignore quota errors
+        }
+      }, 180)
       return resolved
     })
   }, [])
@@ -142,17 +151,17 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     [habitsFor],
   )
 
-  const store: Store = {
-    ...data,
-    weekDays,
-    habitsFor,
-    progressFor,
-    isDone: (habit, d) => habit.completedDayKeys.includes(dayKey(d)),
-    toggleHabit: (id, d) => {
+  const isDone = useCallback(
+    (habit: Habit, d: Date) => habit.completedDayKeys.includes(dayKey(d)),
+    [],
+  )
+
+  const toggleHabit = useCallback(
+    (id: string, d: Date) => {
       const key = dayKey(d)
-      persist({
-        ...data,
-        habits: data.habits.map((h) => {
+      persist((prev) => ({
+        ...prev,
+        habits: prev.habits.map((h) => {
           if (h.id !== id) return h
           const has = h.completedDayKeys.includes(key)
           return {
@@ -162,57 +171,95 @@ export function StoreProvider({ children }: { children: ReactNode }) {
               : [...h.completedDayKeys, key],
           }
         }),
+      }))
+    },
+    [persist],
+  )
+
+  const addHabit = useCallback(
+    (h: Omit<Habit, 'id' | 'completedDayKeys'>) =>
+      persist((prev) => ({
+        ...prev,
+        habits: [...prev.habits, { ...h, id: uid(), completedDayKeys: [] }],
+      })),
+    [persist],
+  )
+
+  const updateHabit = useCallback(
+    (id: string, patch: Partial<Habit>) =>
+      persist((prev) => ({
+        ...prev,
+        habits: prev.habits.map((h) => (h.id === id ? { ...h, ...patch } : h)),
+      })),
+    [persist],
+  )
+
+  const deleteHabit = useCallback(
+    (id: string) =>
+      persist((prev) => ({
+        ...prev,
+        habits: prev.habits.filter((h) => h.id !== id),
+      })),
+    [persist],
+  )
+
+  const setDayNote = useCallback(
+    (dateKey: string, text: string) => {
+      persist((prev) => {
+        const others = prev.dayNotes.filter((n) => n.dateKey !== dateKey)
+        return {
+          ...prev,
+          dayNotes: text.trim()
+            ? [...others, { dateKey, text }]
+            : others,
+        }
       })
     },
-    addHabit: (h) =>
-      persist({
-        ...data,
-        habits: [
-          ...data.habits,
-          { ...h, id: uid(), completedDayKeys: [] },
-        ],
-      }),
-    updateHabit: (id, patch) =>
-      persist({
-        ...data,
-        habits: data.habits.map((h) => (h.id === id ? { ...h, ...patch } : h)),
-      }),
-    deleteHabit: (id) =>
-      persist({ ...data, habits: data.habits.filter((h) => h.id !== id) }),
-    setDayNote: (dateKey, text) => {
-      const others = data.dayNotes.filter((n) => n.dateKey !== dateKey)
-      persist({
-        ...data,
-        dayNotes: text.trim()
-          ? [...others, { dateKey, text }]
-          : others,
-      })
-    },
-    dayNote: (key) => data.dayNotes.find((n) => n.dateKey === key)?.text ?? '',
-    addReminder: (text) => {
+    [persist],
+  )
+
+  const dayNote = useCallback(
+    (key: string) => data.dayNotes.find((n) => n.dateKey === key)?.text ?? '',
+    [data.dayNotes],
+  )
+
+  const addReminder = useCallback(
+    (text: string) => {
       const t = text.trim()
       if (!t) return
-      persist({
-        ...data,
+      persist((prev) => ({
+        ...prev,
         reminders: [
           { id: uid(), text: t, createdAt: new Date().toISOString() },
-          ...data.reminders,
+          ...prev.reminders,
         ],
-      })
+      }))
     },
-    updateReminder: (id, text) =>
-      persist({
-        ...data,
-        reminders: data.reminders.map((r) =>
+    [persist],
+  )
+
+  const updateReminder = useCallback(
+    (id: string, text: string) =>
+      persist((prev) => ({
+        ...prev,
+        reminders: prev.reminders.map((r) =>
           r.id === id ? { ...r, text: text.trim() || r.text } : r,
         ),
-      }),
-    deleteReminder: (id) =>
-      persist({
-        ...data,
-        reminders: data.reminders.filter((r) => r.id !== id),
-      }),
-    addMessage: (m) =>
+      })),
+    [persist],
+  )
+
+  const deleteReminder = useCallback(
+    (id: string) =>
+      persist((prev) => ({
+        ...prev,
+        reminders: prev.reminders.filter((r) => r.id !== id),
+      })),
+    [persist],
+  )
+
+  const addMessage = useCallback(
+    (m: Omit<ChatMessage, 'id'>) =>
       persist((prev) => ({
         ...prev,
         messages: [...prev.messages, { ...m, id: uid() }],
@@ -221,39 +268,144 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           prev.messagesLeft - (m.role === 'user' ? 1 : 0),
         ),
       })),
-    clearChat: () => persist((prev) => ({ ...prev, messages: [] })),
-    seedWelcome: (text) =>
-      persist((prev) => ({
-        ...prev,
-        messages: [{ id: uid(), role: 'assistant', text }],
-      })),
-    setTheme: (t) => persist({ ...data, theme: t }),
-    setRemindersOn: (on) => persist({ ...data, remindersOn: on }),
-    setVoice: (id) => persist({ ...data, voiceId: id }),
-    setVoiceSpeed: (n) => persist({ ...data, voiceSpeed: n }),
-    resetAll: () => persist(defaults()),
-    weekCompletedCount: weekDays.reduce((sum, d) => {
-      const list = habitsFor(d)
-      const key = dayKey(d)
-      return (
-        sum +
-        list.filter((h) => h.completedDayKeys.includes(key)).length
-      )
-    }, 0),
-    streakCount: (() => {
-      let streak = 0
-      const cur = new Date()
-      cur.setHours(0, 0, 0, 0)
-      while (true) {
-        if (habitsFor(cur).length === 0) break
-        if (progressFor(cur) >= 1) streak += 1
-        else break
-        cur.setDate(cur.getDate() - 1)
-        if (streak > 365) break
-      }
-      return streak
-    })(),
-  }
+    [persist],
+  )
+
+  const clearChat = useCallback(
+    () => persist((prev) => ({ ...prev, messages: [] })),
+    [persist],
+  )
+
+  const seedWelcome = useCallback(
+    (text: string) =>
+      persist((prev) => {
+        if (
+          prev.messages.length === 1 &&
+          prev.messages[0].role === 'assistant' &&
+          prev.messages[0].text === text
+        ) {
+          return prev
+        }
+        if (
+          prev.messages.length === 1 &&
+          prev.messages[0].role === 'assistant'
+        ) {
+          // Keep stable id — avoids list remount flicker.
+          return {
+            ...prev,
+            messages: [{ ...prev.messages[0], text }],
+          }
+        }
+        if (prev.messages.length === 0) {
+          return {
+            ...prev,
+            messages: [{ id: uid(), role: 'assistant', text }],
+          }
+        }
+        return prev
+      }),
+    [persist],
+  )
+
+  const setTheme = useCallback(
+    (t: ThemeId) => persist((prev) => ({ ...prev, theme: t })),
+    [persist],
+  )
+  const setRemindersOn = useCallback(
+    (on: boolean) => persist((prev) => ({ ...prev, remindersOn: on })),
+    [persist],
+  )
+  const setVoice = useCallback(
+    (id: string) => persist((prev) => ({ ...prev, voiceId: id })),
+    [persist],
+  )
+  const setVoiceSpeed = useCallback(
+    (n: number) => persist((prev) => ({ ...prev, voiceSpeed: n })),
+    [persist],
+  )
+  const resetAll = useCallback(() => persist(defaults()), [persist])
+
+  const weekCompletedCount = useMemo(
+    () =>
+      weekDays.reduce((sum, d) => {
+        const list = habitsFor(d)
+        const key = dayKey(d)
+        return (
+          sum +
+          list.filter((h) => h.completedDayKeys.includes(key)).length
+        )
+      }, 0),
+    [weekDays, habitsFor],
+  )
+
+  const streakCount = useMemo(() => {
+    let streak = 0
+    const cur = new Date()
+    cur.setHours(0, 0, 0, 0)
+    while (true) {
+      if (habitsFor(cur).length === 0) break
+      if (progressFor(cur) >= 1) streak += 1
+      else break
+      cur.setDate(cur.getDate() - 1)
+      if (streak > 365) break
+    }
+    return streak
+  }, [habitsFor, progressFor])
+
+  const store = useMemo<Store>(
+    () => ({
+      ...data,
+      weekDays,
+      habitsFor,
+      progressFor,
+      isDone,
+      toggleHabit,
+      addHabit,
+      updateHabit,
+      deleteHabit,
+      setDayNote,
+      dayNote,
+      addReminder,
+      updateReminder,
+      deleteReminder,
+      addMessage,
+      clearChat,
+      seedWelcome,
+      setTheme,
+      setRemindersOn,
+      setVoice,
+      setVoiceSpeed,
+      resetAll,
+      weekCompletedCount,
+      streakCount,
+    }),
+    [
+      data,
+      weekDays,
+      habitsFor,
+      progressFor,
+      isDone,
+      toggleHabit,
+      addHabit,
+      updateHabit,
+      deleteHabit,
+      setDayNote,
+      dayNote,
+      addReminder,
+      updateReminder,
+      deleteReminder,
+      addMessage,
+      clearChat,
+      seedWelcome,
+      setTheme,
+      setRemindersOn,
+      setVoice,
+      setVoiceSpeed,
+      resetAll,
+      weekCompletedCount,
+      streakCount,
+    ],
+  )
 
   return <Ctx.Provider value={store}>{children}</Ctx.Provider>
 }

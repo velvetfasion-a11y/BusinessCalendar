@@ -72,19 +72,20 @@ export default function App() {
 
   return (
     <div className="app-shell">
-      <main className="page-host" key={tab}>
-        {tab === 'habits' && (
+      <main className="page-host">
+        {/* Keep tabs mounted to avoid remount jank; hide inactive ones. */}
+        <div hidden={tab !== 'habits'}>
           <HabitsPage onProfile={() => setAccountOpen(true)} />
-        )}
-        {tab === 'chat' && (
+        </div>
+        <div hidden={tab !== 'chat'}>
           <ChatPage
             onProfile={() => setAccountOpen(true)}
             onPaywall={() => setPaywallOpen(true)}
           />
-        )}
-        {tab === 'note' && (
+        </div>
+        <div hidden={tab !== 'note'}>
           <NotesPage onProfile={() => setAccountOpen(true)} />
-        )}
+        </div>
       </main>
 
       <nav className="nav-bubble" aria-label="Main">

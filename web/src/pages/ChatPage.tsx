@@ -1,8 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
-import { loadLlm, streamChat, type ChatMessage as LlmMsg, type LlmStatus } from '../lib/llm'
-import { DEFAULT_LLM_MODEL } from '../lib/models'
 import { offlineCoachReply, welcomeMessage, type CoachContext } from '../lib/offlineCoach'
-import { initTts, speak, stopSpeaking, type TtsStatus } from '../lib/tts'
+import { speak, stopSpeaking } from '../lib/tts'
 import { useStore } from '../lib/store'
 import { AiChatSettings } from './AiChatSettings'
 
@@ -79,88 +77,63 @@ export function ChatPage({
   const [showQuota, setShowQuota] = useState(true)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [listeningId, setListeningId] = useState<string | null>(null)
-  const [llm, setLlm] = useState<LlmStatus>({
-    ready: true,
-    loading: false,
-    progress: 'Achieve coach ready',
-    percent: 100,
-    error: null,
-    modelId: null,
-    backend: 'offline',
-  })
-  const [tts, setTts] = useState<TtsStatus>({
-    engine: 'none',
-    ready: false,
-    loading: true,
-    progress: 'Starting voice…',
-    error: null,
-  })
   const listRef = useRef<HTMLDivElement>(null)
-  const booted = useRef(false)
+  const seedWelcome = store.seedWelcome
+  const messages = store.messages
 
-  const todayPercent = store.progressFor(
-    (() => {
-      const d = new Date()
-      d.setHours(0, 0, 0, 0)
-      return d
-    })(),
+  const habitCount = store.habits.length
+  const habitTitlesKey = store.habits.map((h) => h.title).join('\0')
+  const streakCount = store.streakCount
+  const profileName = store.profileName
+  const todayPercent = Math.round(
+    store.progressFor(
+      (() => {
+        const d = new Date()
+        d.setHours(0, 0, 0, 0)
+        return d
+      })(),
+    ) * 100,
   )
+
   const ctx = useMemo<CoachContext>(
     () => ({
-      habitCount: store.habits.length,
-      todayPercent: Math.round(todayPercent * 100),
-      habitTitles: store.habits.map((h) => h.title),
-      streak: store.streakCount,
-      profileName: store.profileName,
-    }),
-    [
-      store.habits,
-      store.profileName,
-      store.streakCount,
+      habitCount,
       todayPercent,
-    ],
+      habitTitles: habitTitlesKey ? habitTitlesKey.split('\0') : [],
+      streak: streakCount,
+      profileName,
+    }),
+    [habitCount, habitTitlesKey, todayPercent, streakCount, profileName],
   )
 
-  const messageCount = store.messages.length
-  const firstMessage = store.messages[0]
-
-  // Seed / refresh the Achieve welcome when chat is empty or only holds the greeting.
+  // Seed / refresh greeting without remounting the bubble (stable id in store).
   useEffect(() => {
     const welcome = welcomeMessage(ctx)
-    if (messageCount === 0) {
-      store.seedWelcome(welcome)
+    if (messages.length === 0) {
+      seedWelcome(welcome)
       return
     }
-    const onlyGreeting = messageCount === 1 && firstMessage?.role === 'assistant'
-    if (onlyGreeting && firstMessage.text !== welcome) {
-      store.seedWelcome(welcome)
+    if (
+      messages.length === 1 &&
+      messages[0].role === 'assistant' &&
+      messages[0].text !== welcome
+    ) {
+      seedWelcome(welcome)
     }
-    // Intentionally omit `store` — only react to message/context changes.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ctx, messageCount, firstMessage?.id, firstMessage?.text, firstMessage?.role])
+  }, [ctx, messages, seedWelcome])
 
   useEffect(() => {
-    listRef.current?.scrollTo({
-      top: listRef.current.scrollHeight,
-      behavior: 'smooth',
-    })
-  }, [store.messages, busy])
-
-  useEffect(() => {
-    if (booted.current) return
-    booted.current = true
-    void initTts(setTts)
-    void loadLlm(DEFAULT_LLM_MODEL, setLlm)
-  }, [])
+    const el = listRef.current
+    if (!el) return
+    el.scrollTop = el.scrollHeight
+  }, [store.messages.length, busy])
 
   useEffect(() => () => stopSpeaking(), [])
 
   async function onSubmit(e?: FormEvent<HTMLFormElement>) {
     e?.preventDefault()
     const form = e?.currentTarget
-    const raw = form
-      ? new FormData(form).get('coach-input')
-      : null
+    const raw = form ? new FormData(form).get('coach-input') : null
     const fromDom = typeof raw === 'string' ? raw : ''
     const text = (fromDom || input).trim()
     if (!text || busy) return
@@ -169,42 +142,8 @@ export function ChatPage({
     setBusy(true)
     stopSpeaking()
     try {
-      // Achieve voice first (matches App Store / live coach). Optional WebLLM
-      // only when ready — then we still guard against chatbot-style drift.
-      let reply = offlineCoachReply(text, 'motivation', ctx)
-      if (llm.backend === 'webllm' && llm.ready) {
-        const history: LlmMsg[] = [
-          {
-            id: 'ctx',
-            role: 'assistant',
-            mode: 'motivation',
-            content: `User context: ${ctx.habitCount} habits (${ctx.habitTitles.slice(0, 5).join(', ') || 'none'}); today ${ctx.todayPercent}% aligned; streak ${ctx.streak}.`,
-          },
-          ...store.messages.map((m) => ({
-            id: m.id,
-            role: m.role,
-            mode: 'motivation' as const,
-            content: m.text,
-          })),
-          {
-            id: crypto.randomUUID(),
-            role: 'user',
-            mode: 'motivation',
-            content: text,
-          },
-        ]
-        const llmReply = await streamChat(history, 'motivation', () => {}, ctx)
-        const ok =
-          llmReply.trim().length > 0 &&
-          llmReply.length <= 520 &&
-          !/^[-*•\d]/.test(llmReply.trim()) &&
-          !/as an ai|language model|i'm here to help|certainly!|of course!/i.test(
-            llmReply,
-          )
-        if (ok) reply = llmReply.trim()
-      } else {
-        await new Promise((r) => setTimeout(r, 480))
-      }
+      await new Promise((r) => setTimeout(r, 320))
+      const reply = offlineCoachReply(text, 'motivation', ctx)
       store.addMessage({ role: 'assistant', text: reply })
     } finally {
       setBusy(false)
@@ -215,7 +154,8 @@ export function ChatPage({
     stopSpeaking()
     setListeningId(id)
     try {
-      await speak(text, tts.engine === 'kokoro' ? 'kokoro' : 'webspeech')
+      // Lightweight browser TTS only — no Kokoro download on Chat open.
+      await speak(text, 'webspeech')
     } finally {
       setListeningId(null)
     }
@@ -294,12 +234,7 @@ export function ChatPage({
         <button type="button" className="circle" aria-label="Voice input" disabled>
           <MicIcon />
         </button>
-        <button
-          type="submit"
-          className="circle send"
-          disabled={busy}
-          aria-label="Send"
-        >
+        <button type="submit" className="circle send" disabled={busy} aria-label="Send">
           <SendIcon />
         </button>
       </form>

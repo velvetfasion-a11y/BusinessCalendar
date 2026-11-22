@@ -45,16 +45,18 @@ export function HabitsPage({ onProfile }: { onProfile: () => void }) {
   const focusDone = focusHabits.filter((h) => store.isDone(h, focus)).length
   const upcoming = Array.from({ length: 6 }, (_, i) => addDays(focus, i + 1))
 
+  const habitsFor = store.habitsFor
+  const habits = store.habits
   const weekCount = useMemo(() => {
     let sum = 0
     for (let i = 0; i < 7; i++) {
       const d = addDays(focus, i)
-      const list = store.habitsFor(d)
+      const list = habitsFor(d)
       const key = dayKey(d)
       sum += list.filter((h) => h.completedDayKeys.includes(key)).length
     }
     return sum
-  }, [focus, store])
+  }, [focus, habitsFor, habits])
 
   function shiftWeek(dir: -1 | 1) {
     setFocus((f) => addDays(f, dir * 7))
