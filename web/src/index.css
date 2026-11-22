@@ -597,43 +597,63 @@ textarea {
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 14px;
   padding-bottom: 12px;
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.msg-block {
+  display: flex;
+  flex-direction: column;
+  max-width: 100%;
+}
+
+.msg-block.user {
+  align-items: flex-end;
+}
+
+.msg-block.assistant {
+  align-items: flex-start;
 }
 
 .bubble {
   max-width: 92%;
   border: 1px solid var(--border-soft);
   background: var(--bg-elev);
-  border-radius: 22px;
-  padding: 14px 16px;
-  line-height: 1.45;
+  border-radius: 20px;
+  padding: 16px 18px;
+  line-height: 1.5;
   white-space: pre-wrap;
+  color: var(--gold);
+  font-size: 15px;
 }
 
 .bubble.user {
-  align-self: flex-end;
   background: rgba(201, 168, 76, 0.12);
   border-color: var(--border);
 }
 
-.bubble.assistant {
-  align-self: flex-start;
+.bubble.thinking {
+  opacity: 0.55;
+  letter-spacing: 0.2em;
 }
 
 .bubble-actions {
   display: flex;
   gap: 8px;
-  margin-top: 2px;
-  margin-bottom: 8px;
+  margin-top: 8px;
 }
 
 .bubble-actions button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   border: 1px solid var(--border);
   background: transparent;
   color: var(--gold);
   border-radius: 999px;
-  padding: 5px 12px;
+  padding: 6px 12px;
   font-size: 12px;
   cursor: pointer;
 }
@@ -645,7 +665,7 @@ textarea {
   border: 1px solid var(--border);
   background: var(--bg-elev);
   border-radius: 999px;
-  padding: 6px 6px 6px 16px;
+  padding: 6px 6px 6px 18px;
   margin-top: auto;
 }
 
@@ -656,6 +676,7 @@ textarea {
   outline: none;
   min-width: 0;
   font-size: 15px;
+  color: var(--gold);
 }
 
 .composer input::placeholder {
@@ -675,10 +696,19 @@ textarea {
   flex-shrink: 0;
 }
 
+.composer .circle:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
 .composer .send {
   background: var(--gold);
   color: #0d0d0d;
   border-color: transparent;
+}
+
+.composer .send:disabled {
+  opacity: 0.35;
 }
 
 /* —— Notes / Positive Reminders —— */

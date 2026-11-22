@@ -13,8 +13,13 @@ import type {
   ThemeId,
 } from './types'
 
-const STORAGE_KEY = 'achieve.luxury.v2'
-const LEGACY_KEYS = ['achieve.luxury.v1', 'achieve.web.v1', 'achieve.web.v2']
+const STORAGE_KEY = 'achieve.luxury.v3'
+const LEGACY_KEYS = [
+  'achieve.luxury.v1',
+  'achieve.luxury.v2',
+  'achieve.web.v1',
+  'achieve.web.v2',
+]
 
 function uid() {
   return crypto.randomUUID()
@@ -43,13 +48,7 @@ function defaults(): AppData {
     habits: [],
     dayNotes: [],
     reminders: [],
-    messages: [
-      {
-        id: uid(),
-        role: 'assistant',
-        text: "Welcome. ✨\nI'm your Achieve coach.\nWhat's on your mind?",
-      },
-    ],
+    messages: [],
     theme: 'gold-dark',
     profileName: 'Guest',
     messagesLeft: 200,
@@ -92,6 +91,7 @@ type Store = AppData & {
   deleteReminder: (id: string) => void
   addMessage: (m: Omit<ChatMessage, 'id'>) => void
   clearChat: () => void
+  seedWelcome: (text: string) => void
   setTheme: (t: ThemeId) => void
   setRemindersOn: (on: boolean) => void
   setVoice: (id: string) => void
@@ -215,16 +215,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         messages: [...data.messages, { ...m, id: uid() }],
         messagesLeft: Math.max(0, data.messagesLeft - (m.role === 'user' ? 1 : 0)),
       }),
-    clearChat: () =>
+    clearChat: () => persist({ ...data, messages: [] }),
+    seedWelcome: (text) =>
       persist({
         ...data,
-        messages: [
-          {
-            id: uid(),
-            role: 'assistant',
-            text: "Welcome back. ✨\nWhat's on your mind?",
-          },
-        ],
+        messages: [{ id: uid(), role: 'assistant', text }],
       }),
     setTheme: (t) => persist({ ...data, theme: t }),
     setRemindersOn: (on) => persist({ ...data, remindersOn: on }),

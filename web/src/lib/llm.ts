@@ -1,6 +1,6 @@
 import { coachModeById, type CoachModeId, type LlmModelId } from './models'
 import { probeEnvironment } from './gpu'
-import { offlineCoachReply } from './offlineCoach'
+import { offlineCoachReply, type CoachContext } from './offlineCoach'
 
 export type ChatMessage = {
   id: string
@@ -156,13 +156,13 @@ export async function streamChat(
   history: ChatMessage[],
   mode: CoachModeId,
   onToken: (fullText: string) => void,
+  ctx?: CoachContext,
 ): Promise<string> {
   const lastUser = [...history].reverse().find((m) => m.role === 'user')
   const userText = lastUser?.content ?? ''
 
   if (backend !== 'webllm' || !engine) {
-    // Simulate a short stream so the UI feels alive.
-    const reply = offlineCoachReply(userText, mode)
+    const reply = offlineCoachReply(userText, mode, ctx)
     onToken(reply)
     return reply
   }
@@ -180,8 +180,8 @@ export async function streamChat(
     const chunks = await engine.chat.completions.create({
       messages,
       stream: true,
-      temperature: 0.7,
-      max_tokens: 512,
+      temperature: 0.65,
+      max_tokens: 280,
     })
 
     let full = ''
@@ -193,12 +193,12 @@ export async function streamChat(
       }
     }
     if (!full.trim()) {
-      full = offlineCoachReply(userText, mode)
+      full = offlineCoachReply(userText, mode, ctx)
       onToken(full)
     }
     return full
   } catch (err) {
-    const reply = offlineCoachReply(userText, mode)
+    const reply = offlineCoachReply(userText, mode, ctx)
     onToken(reply)
     console.warn('WebLLM chat failed, using offline coach', err)
     return reply
