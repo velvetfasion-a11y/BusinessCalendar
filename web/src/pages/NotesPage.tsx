@@ -10,19 +10,31 @@ function ProfileIcon() {
   )
 }
 
-function PencilIcon() {
+function BellIcon() {
   return (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-      <path d="M4 20l4.5-1L19 8.5 15.5 5 5 15.5 4 20z" strokeLinejoin="round" />
-      <path d="M13.5 6.5l4 4" strokeLinecap="round" />
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+      <path d="M6 9a6 6 0 0112 0c0 7 2 7 2 9H4c0-2 2-2 2-9" strokeLinejoin="round" />
+      <path d="M10 20a2 2 0 004 0" strokeLinecap="round" />
+    </svg>
+  )
+}
+
+function PencilIcon({ size = 13 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <path d="M4 20l4.2-1.1L19 8.1 15.9 5 5.1 15.8 4 20z" strokeLinejoin="round" />
+      <path d="M13.8 6.2l4 4" strokeLinecap="round" />
     </svg>
   )
 }
 
 function TrashIcon() {
   return (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-      <path d="M5 8h14M10 8V6h4v2M9 8v10m6-10v10M8 18h8" strokeLinecap="round" strokeLinejoin="round" />
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7">
+      <path d="M5 7h14" strokeLinecap="round" />
+      <path d="M10 7V5h4v2" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M8 7l1 13h6l1-13" strokeLinejoin="round" />
+      <path d="M10 11v6M14 11v6" strokeLinecap="round" />
     </svg>
   )
 }
@@ -52,6 +64,7 @@ export function NotesPage({ onProfile }: { onProfile: () => void }) {
   const holdTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const holdFired = useRef(false)
   const listRef = useRef<HTMLDivElement>(null)
+  const inputRef = useRef<HTMLTextAreaElement>(null)
 
   const editing = store.reminders.find((r) => r.id === editingId)
 
@@ -65,6 +78,10 @@ export function NotesPage({ onProfile }: { onProfile: () => void }) {
     document.addEventListener('pointerdown', onPointerDown)
     return () => document.removeEventListener('pointerdown', onPointerDown)
   }, [])
+
+  useEffect(() => {
+    if (editingId) inputRef.current?.focus()
+  }, [editingId])
 
   function clearHold() {
     if (holdTimer.current) {
@@ -120,7 +137,6 @@ export function NotesPage({ onProfile }: { onProfile: () => void }) {
   function onCardPointerUp(id: string, text: string) {
     clearHold()
     if (holdFired.current) return
-    // Short tap: if already armed, keep actions; else open edit.
     if (armedId === id) return
     if (armedId && armedId !== id) {
       setArmedId(null)
@@ -135,18 +151,17 @@ export function NotesPage({ onProfile }: { onProfile: () => void }) {
 
   return (
     <div className="page notes-page">
-      <div className="top-row" style={{ justifyContent: 'center', position: 'relative' }}>
+      <div className="top-row notes-top">
         <button
           type="button"
-          className="pill-chip"
+          className="pill-chip reminders-pill"
           onClick={() => store.setRemindersOn(!store.remindersOn)}
         >
-          {store.remindersOn ? '🔔 Reminders on' : '🔕 Reminders off'}
+          <BellIcon /> {store.remindersOn ? 'Reminders on' : 'Reminders off'}
         </button>
         <button
           type="button"
           className="profile-btn"
-          style={{ position: 'absolute', right: 0 }}
           onClick={onProfile}
           aria-label="Account"
         >
@@ -159,7 +174,10 @@ export function NotesPage({ onProfile }: { onProfile: () => void }) {
       {editing && (
         <div className="editing-bar">
           <span className="editing-meta">
-            <span className="pencil">✎</span> Editing
+            <span className="pencil" aria-hidden>
+              <PencilIcon size={12} />
+            </span>
+            <span className="editing-label">Editing</span>
             <span className="dot">·</span>
             <span className="when">{formatWhen(editing.createdAt)}</span>
           </span>
@@ -171,6 +189,7 @@ export function NotesPage({ onProfile }: { onProfile: () => void }) {
 
       <div className={`note-input-wrap ${editing ? 'editing' : ''}`}>
         <textarea
+          ref={inputRef}
           className="note-input"
           rows={2}
           placeholder="Write a note…"
@@ -184,7 +203,7 @@ export function NotesPage({ onProfile }: { onProfile: () => void }) {
             onClick={removeEditing}
             aria-label="Delete note"
           >
-            🗑
+            <TrashIcon />
           </button>
         )}
       </div>
@@ -200,10 +219,11 @@ export function NotesPage({ onProfile }: { onProfile: () => void }) {
       <div className="reminder-list" ref={listRef}>
         {store.reminders.map((r) => {
           const armed = armedId === r.id
+          const active = editingId === r.id
           return (
             <div
               key={r.id}
-              className={`reminder-row ${armed ? 'armed' : ''} ${editingId === r.id ? 'active' : ''}`}
+              className={`reminder-row ${armed ? 'armed' : ''} ${active ? 'active' : ''}`}
             >
               <div className={`reminder-actions ${armed ? 'show' : ''}`} aria-hidden={!armed}>
                 <button
@@ -213,7 +233,7 @@ export function NotesPage({ onProfile }: { onProfile: () => void }) {
                   tabIndex={armed ? 0 : -1}
                   onClick={() => startEdit(r.id, r.text)}
                 >
-                  <PencilIcon />
+                  <PencilIcon size={15} />
                 </button>
                 <button
                   type="button"
@@ -238,12 +258,16 @@ export function NotesPage({ onProfile }: { onProfile: () => void }) {
                   setArmedId(r.id)
                 }}
               >
-                <div className="reminder-top">
+                <div className="reminder-body">
                   <h3>{titleLine(r.text)}</h3>
-                  {editingId === r.id && <span className="edit-badge">✎</span>}
+                  <p>{r.text}</p>
+                  <time>{formatWhen(r.createdAt)}</time>
                 </div>
-                <p>{r.text}</p>
-                <time>{formatWhen(r.createdAt)}</time>
+                {active && (
+                  <span className="edit-badge" aria-hidden>
+                    <PencilIcon size={12} />
+                  </span>
+                )}
               </button>
             </div>
           )
