@@ -20,12 +20,22 @@ function formatWhen(iso: string) {
   })
 }
 
+function titleLine(text: string) {
+  const line = text.trim().split(/\n/)[0] || text
+  return line.length > 34 ? `${line.slice(0, 34)}…` : line
+}
+
 export function NotesPage({ onProfile }: { onProfile: () => void }) {
   const store = useStore()
   const [draft, setDraft] = useState('')
   const [editingId, setEditingId] = useState<string | null>(null)
 
   const editing = store.reminders.find((r) => r.id === editingId)
+
+  function cancelEdit() {
+    setEditingId(null)
+    setDraft('')
+  }
 
   function save() {
     const text = draft.trim()
@@ -39,9 +49,15 @@ export function NotesPage({ onProfile }: { onProfile: () => void }) {
     setDraft('')
   }
 
+  function removeEditing() {
+    if (!editingId) return
+    store.deleteReminder(editingId)
+    cancelEdit()
+  }
+
   return (
     <div className="page notes-page">
-      <div className="top-row" style={{ justifyContent: 'center' }}>
+      <div className="top-row" style={{ justifyContent: 'center', position: 'relative' }}>
         <button
           type="button"
           className="pill-chip"
@@ -49,54 +65,55 @@ export function NotesPage({ onProfile }: { onProfile: () => void }) {
         >
           {store.remindersOn ? '🔔 Reminders on' : '🔕 Reminders off'}
         </button>
-        <span style={{ position: 'absolute', right: 16 }}>
-          <button type="button" className="profile-btn" onClick={onProfile} aria-label="Account">
-            <ProfileIcon />
-          </button>
-        </span>
+        <button
+          type="button"
+          className="profile-btn"
+          style={{ position: 'absolute', right: 0 }}
+          onClick={onProfile}
+          aria-label="Account"
+        >
+          <ProfileIcon />
+        </button>
       </div>
 
       <h1 className="brand-title">Positive Reminders</h1>
 
       {editing && (
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 8,
-            marginBottom: 8,
-            color: 'var(--gold)',
-            fontSize: 13,
-          }}
-        >
-          <span>✎ Editing</span>
-          <span style={{ color: 'var(--muted)', marginLeft: 'auto' }}>
-            {formatWhen(editing.createdAt)}
+        <div className="editing-bar">
+          <span className="editing-meta">
+            <span className="pencil">✎</span> Editing
+            <span className="dot">·</span>
+            <span className="when">{formatWhen(editing.createdAt)}</span>
           </span>
-          <button
-            type="button"
-            className="pill-chip"
-            onClick={() => {
-              setEditingId(null)
-              setDraft('')
-            }}
-          >
+          <button type="button" className="cancel-chip" onClick={cancelEdit}>
             Cancel
           </button>
         </div>
       )}
 
-      <textarea
-        className="note-input"
-        rows={2}
-        placeholder="Write a note…"
-        value={draft}
-        onChange={(e) => setDraft(e.target.value)}
-      />
+      <div className={`note-input-wrap ${editing ? 'editing' : ''}`}>
+        <textarea
+          className="note-input"
+          rows={2}
+          placeholder="Write a note…"
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+        />
+        {editing && (
+          <button
+            type="button"
+            className="note-trash"
+            onClick={removeEditing}
+            aria-label="Delete note"
+          >
+            🗑
+          </button>
+        )}
+      </div>
 
       <button
         type="button"
-        className={`save-note ${editing ? 'primary' : ''}`}
+        className={`save-note ${editing || draft.trim() ? 'primary' : ''}`}
         onClick={save}
       >
         {editing ? 'Update Note' : 'Save Note'}
@@ -112,30 +129,12 @@ export function NotesPage({ onProfile }: { onProfile: () => void }) {
             setDraft(r.text)
           }}
         >
-          <h3>{r.text}</h3>
-          {r.text.length > 40 && <p>{r.text}</p>}
-          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-            <time>{formatWhen(r.createdAt)}</time>
-            {editingId === r.id && (
-              <button
-                type="button"
-                style={{
-                  border: 'none',
-                  background: 'transparent',
-                  color: 'var(--danger)',
-                  cursor: 'pointer',
-                }}
-                onClick={(e) => {
-                  e.stopPropagation()
-                  store.deleteReminder(r.id)
-                  setEditingId(null)
-                  setDraft('')
-                }}
-              >
-                🗑
-              </button>
-            )}
+          <div className="reminder-top">
+            <h3>{titleLine(r.text)}</h3>
+            {editingId === r.id && <span className="edit-badge">✎</span>}
           </div>
+          <p>{r.text}</p>
+          <time>{formatWhen(r.createdAt)}</time>
         </button>
       ))}
     </div>

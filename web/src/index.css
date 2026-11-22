@@ -277,6 +277,32 @@ textarea {
   margin-bottom: 12px;
 }
 
+.stats-row.with-nav {
+  gap: 18px;
+}
+
+.week-chevron {
+  border: none;
+  background: transparent;
+  color: var(--gold);
+  font-size: 22px;
+  line-height: 1;
+  padding: 4px 8px;
+  cursor: pointer;
+}
+
+.return-today {
+  display: block;
+  margin: 0 auto 14px;
+  border: none;
+  background: transparent;
+  color: var(--gold);
+  font-family: var(--serif);
+  font-style: italic;
+  font-size: 15px;
+  cursor: pointer;
+}
+
 .stat-block {
   text-align: center;
 }
@@ -661,6 +687,53 @@ textarea {
   margin: 8px 0 16px;
 }
 
+.editing-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.editing-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--gold);
+  font-size: 13px;
+  flex: 1;
+  min-width: 0;
+}
+
+.editing-meta .pencil {
+  font-size: 12px;
+}
+
+.editing-meta .when,
+.editing-meta .dot {
+  color: var(--muted);
+}
+
+.cancel-chip {
+  border: 1px solid var(--border);
+  background: var(--bg-elev);
+  color: var(--text);
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-size: 13px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.note-input-wrap {
+  position: relative;
+  margin-bottom: 10px;
+}
+
+.note-input-wrap.editing .note-input {
+  border-color: var(--gold);
+  padding-right: 44px;
+}
+
 .note-input {
   width: 100%;
   border: 1px solid var(--border);
@@ -670,11 +743,22 @@ textarea {
   min-height: 52px;
   resize: none;
   outline: none;
-  margin-bottom: 10px;
+  display: block;
 }
 
 .note-input::placeholder {
   color: var(--muted);
+}
+
+.note-trash {
+  position: absolute;
+  right: 10px;
+  top: 12px;
+  border: none;
+  background: transparent;
+  color: #ddd;
+  cursor: pointer;
+  font-size: 16px;
 }
 
 .save-note {
@@ -717,12 +801,31 @@ textarea {
   border-color: var(--gold);
 }
 
+.reminder-top {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
 .reminder-card h3 {
   margin: 0 0 4px;
   font-family: var(--serif);
   font-size: 17px;
   font-weight: 600;
   line-height: 1.3;
+  flex: 1;
+}
+
+.edit-badge {
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  background: var(--gold);
+  color: #0d0d0d;
+  display: grid;
+  place-items: center;
+  font-size: 11px;
+  flex-shrink: 0;
 }
 
 .reminder-card p {

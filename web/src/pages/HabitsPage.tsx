@@ -14,13 +14,15 @@ function ProfileIcon() {
   )
 }
 
-function nextDays(from: Date, count: number) {
-  return Array.from({ length: count }, (_, i) => {
-    const d = new Date(from)
-    d.setDate(from.getDate() + i + 1)
-    d.setHours(0, 0, 0, 0)
-    return d
-  })
+function addDays(from: Date, n: number) {
+  const d = new Date(from)
+  d.setDate(from.getDate() + n)
+  d.setHours(0, 0, 0, 0)
+  return d
+}
+
+function sameDay(a: Date, b: Date) {
+  return dayKey(a) === dayKey(b)
 }
 
 export function HabitsPage({ onProfile }: { onProfile: () => void }) {
@@ -30,15 +32,33 @@ export function HabitsPage({ onProfile }: { onProfile: () => void }) {
     d.setHours(0, 0, 0, 0)
     return d
   }, [])
+  const [focus, setFocus] = useState(today)
   const [editHabit, setEditHabit] = useState<Habit | null>(null)
   const [creating, setCreating] = useState(false)
 
+  const viewingToday = sameDay(focus, today)
   const todayProgress = store.progressFor(today)
-  const todayHabits = store.habitsFor(today)
-  const todayDone = todayHabits.filter((h) => store.isDone(h, today)).length
   const pct = Math.round(todayProgress * 100)
   const circumference = 2 * Math.PI * 72
-  const upcoming = nextDays(today, 6)
+
+  const focusHabits = store.habitsFor(focus)
+  const focusDone = focusHabits.filter((h) => store.isDone(h, focus)).length
+  const upcoming = Array.from({ length: 6 }, (_, i) => addDays(focus, i + 1))
+
+  const weekCount = useMemo(() => {
+    let sum = 0
+    for (let i = 0; i < 7; i++) {
+      const d = addDays(focus, i)
+      const list = store.habitsFor(d)
+      const key = dayKey(d)
+      sum += list.filter((h) => h.completedDayKeys.includes(key)).length
+    }
+    return sum
+  }, [focus, store])
+
+  function shiftWeek(dir: -1 | 1) {
+    setFocus((f) => addDays(f, dir * 7))
+  }
 
   return (
     <div className="page habits-page">
@@ -73,18 +93,31 @@ export function HabitsPage({ onProfile }: { onProfile: () => void }) {
         </div>
       </div>
 
-      <div className="stats-row">
+      <div className="stats-row with-nav">
+        <button type="button" className="week-chevron" onClick={() => shiftWeek(-1)} aria-label="Previous week">
+          ‹
+        </button>
         <div className="stat-block">
           <label>WEEK</label>
-          <strong>{store.weekCompletedCount}</strong>
+          <strong>{weekCount}</strong>
         </div>
         <div className="stat-divider" />
         <div className="stat-block">
           <label>HABITS</label>
           <strong>{store.habits.length}</strong>
         </div>
+        <button type="button" className="week-chevron" onClick={() => shiftWeek(1)} aria-label="Next week">
+          ›
+        </button>
       </div>
-      <div className="gold-rule" />
+
+      {!viewingToday ? (
+        <button type="button" className="return-today" onClick={() => setFocus(today)}>
+          — return to today —
+        </button>
+      ) : (
+        <div className="gold-rule" />
+      )}
 
       {!store.habits.length && (
         <p className="empty-habits-hint">
@@ -93,15 +126,15 @@ export function HabitsPage({ onProfile }: { onProfile: () => void }) {
       )}
 
       <DayCard
-        date={today}
-        isToday
-        habits={todayHabits}
-        doneCount={todayDone}
-        onToggle={(id) => store.toggleHabit(id, today)}
+        date={focus}
+        isToday={viewingToday}
+        habits={focusHabits}
+        doneCount={focusDone}
+        onToggle={(id) => store.toggleHabit(id, focus)}
         onEdit={(h) => setEditHabit(h)}
-        note={store.dayNote(dayKey(today))}
-        onNote={(text) => store.setDayNote(dayKey(today), text)}
-        isDone={(h) => store.isDone(h, today)}
+        note={store.dayNote(dayKey(focus))}
+        onNote={(text) => store.setDayNote(dayKey(focus), text)}
+        isDone={(h) => store.isDone(h, focus)}
       />
 
       <div className="day-grid">
@@ -120,6 +153,7 @@ export function HabitsPage({ onProfile }: { onProfile: () => void }) {
               onNote={(text) => store.setDayNote(dayKey(d), text)}
               isDone={(h) => store.isDone(h, d)}
               compact
+              onOpen={() => setFocus(d)}
             />
           )
         })}
@@ -178,6 +212,7 @@ function DayCard({
   onNote,
   isDone,
   compact,
+  onOpen,
 }: {
   date: Date
   isToday?: boolean
@@ -189,6 +224,7 @@ function DayCard({
   onNote: (t: string) => void
   isDone: (h: Habit) => boolean
   compact?: boolean
+  onOpen?: () => void
 }) {
   const dayAbbr = DAY_SHORT[date.getDay()]
   const dateLabel = date.toLocaleDateString('en-GB', {
@@ -197,19 +233,27 @@ function DayCard({
   })
 
   return (
-    <section className={`day-card ${isToday ? 'today' : ''} ${compact ? 'compact' : ''}`}>
+    <section
+      className={`day-card ${isToday ? 'today' : ''} ${compact ? 'compact' : ''}`}
+      onClick={onOpen}
+      style={onOpen ? { cursor: 'pointer' } : undefined}
+    >
       <div className="day-head">
-        <span className="day-badge">{compact ? dayAbbr.slice(0, 3) : dayAbbr}</span>
+        <span className="day-badge">{dayAbbr}</span>
         {isToday ? (
           <>
             <span className="title">Today</span>
             <span className="date">{dateLabel}</span>
           </>
-        ) : (
+        ) : compact ? (
           <>
             <span className="title">{dayAbbr.toUpperCase()}</span>
             <span className="date">{dateLabel}</span>
           </>
+        ) : (
+          <span className="title">
+            {dayAbbr} {dateLabel}
+          </span>
         )}
         <span className="frac">
           {doneCount}/{habits.length}
@@ -223,12 +267,19 @@ function DayCard({
             key={h.id}
             type="button"
             className={`habit-pill ${done ? 'done' : ''}`}
-            onClick={() => onToggle(h.id)}
+            onClick={(e) => {
+              e.stopPropagation()
+              onToggle(h.id)
+            }}
             onContextMenu={(e) => {
               e.preventDefault()
+              e.stopPropagation()
               onEdit(h)
             }}
-            onDoubleClick={() => onEdit(h)}
+            onDoubleClick={(e) => {
+              e.stopPropagation()
+              onEdit(h)
+            }}
           >
             <span className="sym">{h.symbol}</span>
             <span className="label">{h.title}</span>
