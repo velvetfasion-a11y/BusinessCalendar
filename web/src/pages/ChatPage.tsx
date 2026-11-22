@@ -74,16 +74,22 @@ export function ChatPage({
   active = true,
   onProfile,
   onPaywall,
+  onOverlayChange,
 }: {
   active?: boolean
   onProfile: () => void
   onPaywall: () => void
+  onOverlayChange?: (open: boolean) => void
 }) {
   const store = useStore()
   const [input, setInput] = useState('')
   const [busy, setBusy] = useState(false)
   const [showQuota, setShowQuota] = useState(true)
   const [settingsOpen, setSettingsOpen] = useState(false)
+
+  useEffect(() => {
+    onOverlayChange?.(settingsOpen)
+  }, [settingsOpen, onOverlayChange])
   const [listeningId, setListeningId] = useState<string | null>(null)
   const [dictating, setDictating] = useState(false)
   const [voiceHint, setVoiceHint] = useState<string | null>(null)

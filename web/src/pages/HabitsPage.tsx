@@ -44,13 +44,17 @@ function isoWeekNumber(d: Date) {
 }
 
 export function HabitsPage({
+  active = true,
   onProfile,
   createOpen,
   onCreateOpenChange,
+  onOverlayChange,
 }: {
+  active?: boolean
   onProfile: () => void
   createOpen: boolean
   onCreateOpenChange: (open: boolean) => void
+  onOverlayChange?: (open: boolean) => void
 }) {
   const store = useStore()
   const today = useMemo(() => {
@@ -63,6 +67,17 @@ export function HabitsPage({
   const [compactHero, setCompactHero] = useState(false)
   const pageRef = useRef<HTMLDivElement>(null)
   const creating = createOpen
+
+  useEffect(() => {
+    const open = active && (Boolean(editHabit) || creating)
+    onOverlayChange?.(open)
+    return () => onOverlayChange?.(false)
+  }, [active, editHabit, creating, onOverlayChange])
+
+  // Parent closed create / left tab — drop local edit sheet too.
+  useEffect(() => {
+    if (!createOpen || !active) setEditHabit(null)
+  }, [createOpen, active])
 
   const viewingToday = sameDay(focus, today)
   const todayProgress = store.progressFor(today)
@@ -150,12 +165,6 @@ export function HabitsPage({
         <div className="gold-rule" />
       )}
 
-      {!store.habits.length && (
-        <p className="empty-habits-hint">
-          Tap <strong>+</strong> to add your first habit
-        </p>
-      )}
-
       <DayCard
         date={focus}
         isToday={viewingToday}
@@ -190,12 +199,13 @@ export function HabitsPage({
         })}
       </div>
 
-      {(editHabit || creating) && (
+      {active && (editHabit || creating) && (
         <EditHabitSheet
           habit={editHabit}
           onClose={() => {
             setEditHabit(null)
             onCreateOpenChange(false)
+            onOverlayChange?.(false)
           }}
           onSave={(patch) => {
             if (editHabit) store.updateHabit(editHabit.id, patch)
@@ -208,12 +218,14 @@ export function HabitsPage({
               })
             setEditHabit(null)
             onCreateOpenChange(false)
+            onOverlayChange?.(false)
           }}
           onDelete={
             editHabit
               ? () => {
                   store.deleteHabit(editHabit.id)
                   setEditHabit(null)
+                  onOverlayChange?.(false)
                 }
               : undefined
           }

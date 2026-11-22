@@ -55,6 +55,8 @@ export default function App() {
   const [accountOpen, setAccountOpen] = useState(false)
   const [paywallOpen, setPaywallOpen] = useState(false)
   const [createHabit, setCreateHabit] = useState(false)
+  const [habitsOverlay, setHabitsOverlay] = useState(false)
+  const [chatOverlay, setChatOverlay] = useState(false)
   const [visited, setVisited] = useState<Record<Tab, boolean>>(() => ({
     habits: true,
     chat: tab === 'chat',
@@ -76,30 +78,47 @@ export default function App() {
   }, [])
 
   function go(id: Tab) {
+    // Never leave sheets/FAB overlays open across tabs (avoids Save/nav collisions).
+    setCreateHabit(false)
+    setHabitsOverlay(false)
+    setChatOverlay(false)
+    setAccountOpen(false)
+    setPaywallOpen(false)
     setTab(id)
     setVisited((v) => (v[id] ? v : { ...v, [id]: true }))
     if (location.hash.replace(/^#/, '') !== id) location.hash = id
   }
 
+  useEffect(() => {
+    if (tab !== 'habits') setCreateHabit(false)
+    if (tab !== 'chat') setChatOverlay(false)
+  }, [tab])
+
+  const overlayOpen =
+    accountOpen || paywallOpen || createHabit || habitsOverlay || chatOverlay
+
   return (
-    <div className="app-shell">
-      <main className="page-host">
+    <div className={`app-shell tab-${tab}${overlayOpen ? ' overlay-open' : ''}`}>
+      <main className={`page-host tab-${tab}`}>
         {/* Mount once per tab after first visit — no remount flash, no idle Chat work. */}
         {visited.habits && (
           <div className={`page-panel ${tab === 'habits' ? 'active' : ''}`}>
             <HabitsPage
+              active={tab === 'habits'}
               onProfile={() => setAccountOpen(true)}
-              createOpen={createHabit}
+              createOpen={createHabit && tab === 'habits'}
               onCreateOpenChange={setCreateHabit}
+              onOverlayChange={setHabitsOverlay}
             />
           </div>
         )}
         {visited.chat && (
-          <div className={`page-panel ${tab === 'chat' ? 'active' : ''}`}>
+          <div className={`page-panel fill ${tab === 'chat' ? 'active' : ''}`}>
             <ChatPage
               active={tab === 'chat'}
               onProfile={() => setAccountOpen(true)}
               onPaywall={() => setPaywallOpen(true)}
+              onOverlayChange={setChatOverlay}
             />
           </div>
         )}
@@ -110,7 +129,7 @@ export default function App() {
         )}
       </main>
 
-      {tab === 'habits' && (
+      {tab === 'habits' && !overlayOpen && (
         <button
           type="button"
           className="fab"
@@ -124,13 +143,18 @@ export default function App() {
         </button>
       )}
 
-      <nav className="nav-bubble" aria-label="Main">
+      <nav
+        className={`nav-bubble${overlayOpen ? ' hidden' : ''}`}
+        aria-label="Main"
+        aria-hidden={overlayOpen}
+      >
         {TABS.map((t) => (
           <button
             key={t.id}
             type="button"
             className={`nav-item ${tab === t.id ? 'selected' : ''}`}
             onClick={() => go(t.id)}
+            tabIndex={overlayOpen ? -1 : 0}
           >
             {t.icon}
             <span>{t.label}</span>
