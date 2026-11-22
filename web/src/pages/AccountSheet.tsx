@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { THEMES } from '../lib/types'
 import { useStore } from '../lib/store'
+import { ShellPortal } from '../lib/portal'
 
 export function AccountSheet({
   onClose,
@@ -13,6 +14,7 @@ export function AccountSheet({
   const [settingsOpen, setSettingsOpen] = useState(false)
 
   return (
+    <ShellPortal>
     <div className="sheet-backdrop" onClick={onClose}>
       <div
         className="sheet"
@@ -162,5 +164,6 @@ export function AccountSheet({
         </div>
       )}
     </div>
+    </ShellPortal>
   )
 }

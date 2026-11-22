@@ -28,8 +28,9 @@ function CrownIcon() {
 
 function SparkleIcon() {
   return (
-    <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
-      <path d="M12 2l1.4 6.2L20 12l-6.6 3.8L12 22l-1.4-6.2L4 12l6.6-3.8L12 2z" />
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+      <path d="M12 1.6l1.15 5.1 5.1 1.15-5.1 1.15L12 14.1l-1.15-5.1-5.1-1.15 5.1-1.15L12 1.6z" />
+      <path d="M18.6 14.2l.55 2.45 2.45.55-2.45.55-.55 2.45-.55-2.45-2.45-.55 2.45-.55.55-2.45z" opacity="0.85" />
     </svg>
   )
 }
@@ -70,17 +71,25 @@ function SendIcon() {
 }
 
 export function ChatPage({
+  active = true,
   onProfile,
   onPaywall,
+  onOverlayChange,
 }: {
+  active?: boolean
   onProfile: () => void
   onPaywall: () => void
+  onOverlayChange?: (open: boolean) => void
 }) {
   const store = useStore()
   const [input, setInput] = useState('')
   const [busy, setBusy] = useState(false)
   const [showQuota, setShowQuota] = useState(true)
   const [settingsOpen, setSettingsOpen] = useState(false)
+
+  useEffect(() => {
+    onOverlayChange?.(settingsOpen)
+  }, [settingsOpen, onOverlayChange])
   const [listeningId, setListeningId] = useState<string | null>(null)
   const [dictating, setDictating] = useState(false)
   const [voiceHint, setVoiceHint] = useState<string | null>(null)
@@ -116,6 +125,7 @@ export function ChatPage({
 
   // Seed / refresh greeting without remounting the bubble (stable id in store).
   useEffect(() => {
+    if (!active) return
     const welcome = welcomeMessage(ctx)
     if (messages.length === 0) {
       seedWelcome(welcome)
@@ -128,13 +138,22 @@ export function ChatPage({
     ) {
       seedWelcome(welcome)
     }
-  }, [ctx, messages, seedWelcome])
+  }, [active, ctx, messages, seedWelcome])
 
   useEffect(() => {
+    if (!active) return
     const el = listRef.current
     if (!el) return
     el.scrollTop = el.scrollHeight
-  }, [store.messages.length, busy])
+  }, [active, store.messages.length, busy])
+
+  useEffect(() => {
+    if (active) return
+    stopSpeaking()
+    stopListening()
+    setDictating(false)
+    setListeningId(null)
+  }, [active])
 
   useEffect(
     () => () => {

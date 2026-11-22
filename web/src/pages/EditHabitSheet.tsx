@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import { HABIT_SYMBOLS, type Habit } from '../lib/types'
+import { ShellPortal } from '../lib/portal'
 
 const DAYS = [
   { i: 1, label: 'M' },
@@ -50,6 +51,7 @@ export function EditHabitSheet({
   }
 
   return (
+    <ShellPortal>
     <div className="sheet-backdrop" onClick={onClose}>
       <div className="sheet" onClick={(e) => e.stopPropagation()}>
         <div className="grabber" />
@@ -198,5 +200,6 @@ export function EditHabitSheet({
         </div>
       )}
     </div>
+    </ShellPortal>
   )
 }

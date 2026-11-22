@@ -1,9 +1,11 @@
 import { useState } from 'react'
+import { ShellPortal } from '../lib/portal'
 
 export function Paywall({ onClose }: { onClose: () => void }) {
   const [plan, setPlan] = useState<'yearly' | 'monthly'>('yearly')
 
   return (
+    <ShellPortal>
     <div className="paywall">
       <button type="button" className="close" onClick={onClose} aria-label="Close">
         ✕
@@ -100,5 +102,6 @@ export function Paywall({ onClose }: { onClose: () => void }) {
         <a href="#">Privacy</a>
       </p>
     </div>
+    </ShellPortal>
   )
 }
