@@ -25,6 +25,24 @@ function sameDay(a: Date, b: Date) {
   return dayKey(a) === dayKey(b)
 }
 
+/** ISO-8601 week number (Mon-based), matching European Achieve week labels. */
+function isoWeekNumber(d: Date) {
+  const date = new Date(d)
+  date.setHours(0, 0, 0, 0)
+  // Thursday in current week decides the year.
+  date.setDate(date.getDate() + 3 - ((date.getDay() + 6) % 7))
+  const week1 = new Date(date.getFullYear(), 0, 4)
+  return (
+    1 +
+    Math.round(
+      ((date.getTime() - week1.getTime()) / 86400000 -
+        3 +
+        ((week1.getDay() + 6) % 7)) /
+        7,
+    )
+  )
+}
+
 export function HabitsPage({ onProfile }: { onProfile: () => void }) {
   const store = useStore()
   const today = useMemo(() => {
@@ -45,18 +63,7 @@ export function HabitsPage({ onProfile }: { onProfile: () => void }) {
   const focusDone = focusHabits.filter((h) => store.isDone(h, focus)).length
   const upcoming = Array.from({ length: 6 }, (_, i) => addDays(focus, i + 1))
 
-  const habitsFor = store.habitsFor
-  const habits = store.habits
-  const weekCount = useMemo(() => {
-    let sum = 0
-    for (let i = 0; i < 7; i++) {
-      const d = addDays(focus, i)
-      const list = habitsFor(d)
-      const key = dayKey(d)
-      sum += list.filter((h) => h.completedDayKeys.includes(key)).length
-    }
-    return sum
-  }, [focus, habitsFor, habits])
+  const weekNumber = useMemo(() => isoWeekNumber(focus), [focus])
 
   function shiftWeek(dir: -1 | 1) {
     setFocus((f) => addDays(f, dir * 7))
@@ -101,7 +108,7 @@ export function HabitsPage({ onProfile }: { onProfile: () => void }) {
         </button>
         <div className="stat-block">
           <label>WEEK</label>
-          <strong>{weekCount}</strong>
+          <strong>{weekNumber}</strong>
         </div>
         <div className="stat-divider" />
         <div className="stat-block">
