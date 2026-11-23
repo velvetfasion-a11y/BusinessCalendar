@@ -140,20 +140,27 @@ export function HabitsPage({
       )}
 
       <div className="stats-row with-nav">
-        <button type="button" className="week-chevron" onClick={() => shiftWeek(-1)} aria-label="Previous week">
-          ‹
-        </button>
-        <div className="stat-block">
-          <label>WEEK</label>
-          <strong>{weekNumber}</strong>
+        <div className="week-nav">
+          <button type="button" className="week-chevron" onClick={() => shiftWeek(-1)} aria-label="Previous week">
+            ‹
+          </button>
+          <div className="stat-block">
+            <label>WEEK</label>
+            <strong>{weekNumber}</strong>
+          </div>
+          <button type="button" className="week-chevron" onClick={() => shiftWeek(1)} aria-label="Next week">
+            ›
+          </button>
         </div>
         <div className="stat-divider" />
-        <div className="stat-block">
+        <button
+          type="button"
+          className="stat-block habits-stat"
+          onClick={() => onCreateOpenChange(true)}
+          aria-label="Add habit"
+        >
           <label>HABITS</label>
           <strong>{store.habits.length}</strong>
-        </div>
-        <button type="button" className="week-chevron" onClick={() => shiftWeek(1)} aria-label="Next week">
-          ›
         </button>
       </div>
 

@@ -339,6 +339,12 @@ textarea {
   gap: 18px;
 }
 
+.week-nav {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
 .week-chevron {
   border: none;
   background: transparent;
@@ -347,6 +353,18 @@ textarea {
   line-height: 1;
   padding: 4px 8px;
   cursor: pointer;
+}
+
+button.stat-block.habits-stat {
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 12px;
+}
+
+button.stat-block.habits-stat:active {
+  background: rgba(212, 175, 55, 0.12);
 }
 
 .return-today {
