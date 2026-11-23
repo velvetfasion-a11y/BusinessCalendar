@@ -496,6 +496,26 @@ button.stat-block.habits-stat:active {
   text-align: left;
   cursor: pointer;
   overflow: hidden;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  touch-action: manipulation;
+}
+
+.habit-action-sheet .habit-action-sym {
+  margin-right: 4px;
+}
+
+.habit-action-sheet .habit-action-btn {
+  margin-top: 4px;
+}
+
+.habit-action-sheet .sheet-head h2 {
+  font-size: 22px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 70%;
 }
 
 .habit-pill .sym {

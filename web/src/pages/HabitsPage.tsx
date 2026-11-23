@@ -1,7 +1,10 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
 import { dayKey, useStore } from '../lib/store'
 import { HABIT_SYMBOLS, type Habit } from '../lib/types'
+import { ShellPortal } from '../lib/portal'
 import { EditHabitSheet } from './EditHabitSheet'
+
+const LONG_PRESS_MS = 480
 
 const DAY_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
@@ -64,20 +67,29 @@ export function HabitsPage({
   }, [])
   const [focus, setFocus] = useState(today)
   const [editHabit, setEditHabit] = useState<Habit | null>(null)
+  const [menuHabit, setMenuHabit] = useState<Habit | null>(null)
   const [compactHero, setCompactHero] = useState(false)
   const pageRef = useRef<HTMLDivElement>(null)
   const creating = createOpen
 
   useEffect(() => {
-    const open = active && (Boolean(editHabit) || creating)
+    const open = active && (Boolean(editHabit) || creating || Boolean(menuHabit))
     onOverlayChange?.(open)
     return () => onOverlayChange?.(false)
-  }, [active, editHabit, creating, onOverlayChange])
+  }, [active, editHabit, creating, menuHabit, onOverlayChange])
 
-  // Parent closed create / left tab — drop local edit sheet too.
+  // Parent closed create / left tab — drop local sheets too.
   useEffect(() => {
-    if (!createOpen || !active) setEditHabit(null)
-  }, [createOpen, active])
+    if (!active) {
+      setEditHabit(null)
+      setMenuHabit(null)
+    }
+  }, [active])
+
+  useEffect(() => {
+    if (!createOpen) return
+    setMenuHabit(null)
+  }, [createOpen])
 
   const viewingToday = sameDay(focus, today)
   const todayProgress = store.progressFor(today)
@@ -178,7 +190,7 @@ export function HabitsPage({
         habits={focusHabits}
         doneCount={focusDone}
         onToggle={(id) => store.toggleHabit(id, focus)}
-        onEdit={(h) => setEditHabit(h)}
+        onHabitMenu={(h) => setMenuHabit(h)}
         note={store.dayNote(dayKey(focus))}
         onNote={(text) => store.setDayNote(dayKey(focus), text)}
         isDone={(h) => store.isDone(h, focus)}
@@ -195,7 +207,7 @@ export function HabitsPage({
               habits={habits}
               doneCount={done}
               onToggle={(id) => store.toggleHabit(id, d)}
-              onEdit={(h) => setEditHabit(h)}
+              onHabitMenu={(h) => setMenuHabit(h)}
               note={store.dayNote(dayKey(d))}
               onNote={(text) => store.setDayNote(dayKey(d), text)}
               isDone={(h) => store.isDone(h, d)}
@@ -205,6 +217,23 @@ export function HabitsPage({
           )
         })}
       </div>
+
+      {active && menuHabit && (
+        <HabitActionSheet
+          habit={menuHabit}
+          onClose={() => setMenuHabit(null)}
+          onEdit={() => {
+            const h = menuHabit
+            setMenuHabit(null)
+            setEditHabit(h)
+          }}
+          onDelete={() => {
+            store.deleteHabit(menuHabit.id)
+            setMenuHabit(null)
+            onOverlayChange?.(false)
+          }}
+        />
+      )}
 
       {active && (editHabit || creating) && (
         <EditHabitSheet
@@ -242,13 +271,53 @@ export function HabitsPage({
   )
 }
 
+function HabitActionSheet({
+  habit,
+  onClose,
+  onEdit,
+  onDelete,
+}: {
+  habit: Habit
+  onClose: () => void
+  onEdit: () => void
+  onDelete: () => void
+}) {
+  return (
+    <ShellPortal>
+      <div className="sheet-backdrop" onClick={onClose}>
+        <div className="sheet habit-action-sheet" onClick={(e) => e.stopPropagation()}>
+          <div className="grabber" />
+          <div className="sheet-head">
+            <h2>
+              <span className="habit-action-sym">{habit.symbol}</span> {habit.title}
+            </h2>
+            <button type="button" className="link" onClick={onClose}>
+              Close
+            </button>
+          </div>
+          <button type="button" className="ghost-row habit-action-btn" onClick={onEdit}>
+            <div>
+              <strong>Edit</strong>
+              <div className="sub">Name, days, alarm</div>
+            </div>
+            <span>›</span>
+          </button>
+          <button type="button" className="danger-btn" onClick={onDelete}>
+            Delete habit
+          </button>
+        </div>
+      </div>
+    </ShellPortal>
+  )
+}
+
 function DayCard({
   date,
   isToday,
   habits,
   doneCount,
   onToggle,
-  onEdit,
+  onHabitMenu,
   note,
   onNote,
   isDone,
@@ -260,7 +329,7 @@ function DayCard({
   habits: Habit[]
   doneCount: number
   onToggle: (id: string) => void
-  onEdit: (h: Habit) => void
+  onHabitMenu: (h: Habit) => void
   note: string
   onNote: (t: string) => void
   isDone: (h: Habit) => boolean
@@ -298,33 +367,15 @@ function DayCard({
         </span>
       </div>
 
-      {habits.map((h) => {
-        const done = isDone(h)
-        return (
-          <button
-            key={h.id}
-            type="button"
-            className={`habit-pill ${done ? 'done' : ''}`}
-            onClick={(e) => {
-              e.stopPropagation()
-              onToggle(h.id)
-            }}
-            onContextMenu={(e) => {
-              e.preventDefault()
-              e.stopPropagation()
-              onEdit(h)
-            }}
-            onDoubleClick={(e) => {
-              e.stopPropagation()
-              onEdit(h)
-            }}
-          >
-            <span className="sym">{h.symbol}</span>
-            <span className="label">{h.title}</span>
-            <span className={`check ${done ? 'on' : ''}`}>{done ? '✓' : ''}</span>
-          </button>
-        )
-      })}
+      {habits.map((h) => (
+        <HabitPill
+          key={h.id}
+          habit={h}
+          done={isDone(h)}
+          onToggle={() => onToggle(h.id)}
+          onLongPress={() => onHabitMenu(h)}
+        />
+      ))}
 
       <textarea
         className="notes-field"
@@ -335,5 +386,93 @@ function DayCard({
         onClick={(e) => e.stopPropagation()}
       />
     </section>
+  )
+}
+
+function HabitPill({
+  habit,
+  done,
+  onToggle,
+  onLongPress,
+}: {
+  habit: Habit
+  done: boolean
+  onToggle: () => void
+  onLongPress: () => void
+}) {
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const longFiredRef = useRef(false)
+  const pointerIdRef = useRef<number | null>(null)
+
+  function clearTimer() {
+    if (timerRef.current) {
+      clearTimeout(timerRef.current)
+      timerRef.current = null
+    }
+  }
+
+  const originRef = useRef<{ x: number; y: number } | null>(null)
+
+  function startPress(e: ReactPointerEvent<HTMLButtonElement>) {
+    if (e.pointerType === 'mouse' && e.button !== 0) return
+    clearTimer()
+    longFiredRef.current = false
+    pointerIdRef.current = e.pointerId
+    originRef.current = { x: e.clientX, y: e.clientY }
+    timerRef.current = setTimeout(() => {
+      longFiredRef.current = true
+      try {
+        navigator.vibrate?.(12)
+      } catch {
+        // ignore
+      }
+      onLongPress()
+    }, LONG_PRESS_MS)
+  }
+
+  function endPress(e: ReactPointerEvent<HTMLButtonElement>) {
+    if (pointerIdRef.current !== null && e.pointerId !== pointerIdRef.current) return
+    clearTimer()
+    pointerIdRef.current = null
+    originRef.current = null
+  }
+
+  return (
+    <button
+      type="button"
+      className={`habit-pill ${done ? 'done' : ''}`}
+      onPointerDown={(e) => {
+        e.stopPropagation()
+        startPress(e)
+      }}
+      onPointerMove={(e) => {
+        if (pointerIdRef.current !== e.pointerId || !originRef.current || !timerRef.current) return
+        const dx = e.clientX - originRef.current.x
+        const dy = e.clientY - originRef.current.y
+        if (dx * dx + dy * dy > 100) endPress(e)
+      }}
+      onPointerUp={endPress}
+      onPointerCancel={endPress}
+      onPointerLeave={endPress}
+      onClick={(e) => {
+        e.stopPropagation()
+        if (longFiredRef.current) {
+          longFiredRef.current = false
+          return
+        }
+        onToggle()
+      }}
+      onContextMenu={(e) => {
+        e.preventDefault()
+        e.stopPropagation()
+        clearTimer()
+        longFiredRef.current = true
+        onLongPress()
+      }}
+    >
+      <span className="sym">{habit.symbol}</span>
+      <span className="label">{habit.title}</span>
+      <span className={`check ${done ? 'on' : ''}`}>{done ? '✓' : ''}</span>
+    </button>
   )
 }
