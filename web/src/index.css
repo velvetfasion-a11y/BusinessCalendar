@@ -759,7 +759,7 @@ button.stat-block.habits-stat:active {
 .bubble {
   max-width: 92%;
   border: 1px solid var(--border);
-  background: #12100e;
+  background: var(--bg-elev);
   border-radius: 22px;
   padding: 16px 18px;
   line-height: 1.55;
@@ -769,7 +769,7 @@ button.stat-block.habits-stat:active {
 }
 
 .bubble.user {
-  background: rgba(212, 175, 55, 0.12);
+  background: color-mix(in srgb, var(--gold) 14%, var(--bg-elev));
   border-color: var(--border);
   color: var(--text);
 }
